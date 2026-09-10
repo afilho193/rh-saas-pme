@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rh_user
+      POSTGRES_PASSWORD: rh_password
+      POSTGRES_DB: rh_saas
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgresql://rh_user:rh_password@db:5432/rh_saas
+      JWT_SECRET: dev_secret_key_change_in_production
+      NODE_ENV: development
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+    command: npm run dev
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:5000/api
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
