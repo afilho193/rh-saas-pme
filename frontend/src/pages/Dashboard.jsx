@@ -134,7 +134,7 @@ export default function Dashboard() {
                 </div>
                 {summary.expiringDocs > 0 && (
                   <button
-                    onClick={() => navigate('/employees')}
+                    onClick={() => navigate('/documents')}
                     className="mt-4 text-sm text-blue-600 hover:text-blue-700 font-medium"
                   >
                     Verificar documentos →
@@ -175,7 +175,7 @@ export default function Dashboard() {
                 </button>
 
                 <button
-                  onClick={() => navigate('/employees')}
+                  onClick={() => navigate('/documents')}
                   className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 text-left"
                 >
                   <AlertCircle className="w-5 h-5 text-red-600 mb-2" />
