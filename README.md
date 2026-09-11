@@ -39,6 +39,19 @@ npm run dev
 
 Veja `.env.example` em cada pasta.
 
+## Documentação Técnica
+
+Guia completo de arquitetura, banco de dados, API e limitações conhecidas em
+[docs/](docs/README.md). Para rodar localmente sem Docker (incluindo os problemas reais
+que aparecem num Mac), veja [docs/local-development.md](docs/local-development.md).
+
+## Testes
+
+```bash
+cd backend
+npm test
+```
+
 ## Deploy
 
 Estrutura pronta para Railway. Veja `railway.json` na raiz.

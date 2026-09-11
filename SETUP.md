@@ -95,7 +95,7 @@ NODE_ENV=production
 E para o frontend:
 
 ```
-REACT_APP_API_URL=https://seu-backend-railway.up.railway.app/api
+VITE_API_URL=https://seu-backend-railway.up.railway.app/api
 ```
 
 ## Estrutura do Projeto
@@ -136,7 +136,9 @@ postgresql://usuario:senha@host:porta/database_nome
 
 ### Frontend não conecta com backend
 
-Verifique se a porta 5000 está disponível e se o backend está rodando.
+Verifique se a porta configurada em `PORT` (backend/.env) está disponível e se o backend está rodando, e se `VITE_API_URL` (frontend/.env) aponta para essa mesma porta.
+
+**No macOS**, a porta 5000 é usada pelo AirPlay Receiver (Sistema > Compartilhamento) e o backend falha com `EADDRINUSE`. Rode o backend em outra porta (ex: `PORT=5050`) e atualize `VITE_API_URL` de acordo — veja [docs/local-development.md](docs/local-development.md).
 
 ### Precisa resetar o banco
 
