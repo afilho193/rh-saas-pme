@@ -10,36 +10,46 @@
 | Frontend | React 18 + Vite 5 + Tailwind 3 |
 | Roteamento frontend | `react-router-dom` v6 |
 | Ícones | `lucide-react` |
-| Upload de arquivo | `multer`, disco local (`backend/uploads/`, gitignored) |
-| Deploy alvo | Railway (Dockerfiles prontos para backend e frontend) |
+| Upload de arquivo | `multer` (buffer em memória) + `@vercel/blob` (object storage) |
+| Deploy | Vercel — dois projetos (`backend`, `frontend`), deploy automático a cada push em `main` via a integração GitHub |
+| Banco em produção | Supabase (Postgres gerenciado), via a integração Vercel Marketplace |
 
 Não há ORM, fila de jobs, cache, ou serviço de e-mail. Toda a lógica de negócio vive nos
-controllers do Express, com SQL escrito à mão via `pg`. Uploads vão para disco local, não
-para um object storage (S3/Supabase/R2) — ver a nota sobre filesystem efêmero do Railway
-em [known-limitations.md](known-limitations.md).
+controllers do Express, com SQL escrito à mão via `pg`.
+
+**`railway.json` e os `Dockerfile`s continuam no repositório mas não são o caminho de
+deploy usado** — o projeto foi montado originalmente para Railway; a decisão de ir para
+Vercel foi tomada depois (set/2026), pelo tier gratuito sem expiração. Os arquivos do
+Railway ficaram como opção alternativa documentada, não como lixo esquecido — se algum
+dia fizer sentido voltar para lá, o caminho já está pronto e funcionava (foi testado
+manualmente até o login, antes da troca de decisão).
 
 ## Estrutura de pastas
 
 ```
-backend/src/
-├── server.js         # entrypoint: cria o app Express e chama listen()
-├── routes/index.js   # todas as rotas da API, num único arquivo
-├── controllers/       # um arquivo por recurso (employee, payroll, leave, document, dashboard, auth, users)
-├── middleware/auth.js # valida o JWT (injeta req.userId/companyId/role) + requireAdmin
-├── middleware/upload.js # config do multer: destino, nome aleatório do arquivo, tipos/tamanho aceitos
-├── utils/validation.js # validadores pequenos e sem dependência (CPF, datas, e-mail, números)
-├── uploads/            # arquivos enviados (gitignored) — criado em runtime, não versionado
-└── db/
-    ├── config.js      # pool de conexão pg
-    ├── schema.sql      # DDL completo, aplicado via `npm run migrate`
-    └── migrate.js      # lê schema.sql e executa contra o banco
+backend/
+├── api/index.js       # entrypoint serverless: `export default app` — é isto que a Vercel invoca
+├── vercel.json         # reescreve toda rota para /api (o Express interno é que roteia de verdade)
+└── src/
+    ├── server.js         # entrypoint local: cria o app Express e chama listen() — não roda na Vercel
+    ├── routes/index.js   # todas as rotas da API, num único arquivo
+    ├── controllers/       # um arquivo por recurso (employee, payroll, leave, document, dashboard, auth, users)
+    ├── middleware/auth.js # valida o JWT (injeta req.userId/companyId/role) + requireAdmin
+    ├── middleware/upload.js # config do multer: memoryStorage, tipos/tamanho aceitos (o arquivo some da memória depois do handler — vai para o Blob, não para disco)
+    ├── utils/validation.js # validadores pequenos e sem dependência (CPF, datas, e-mail, números)
+    └── db/
+        ├── config.js      # pool de conexão pg — detecta DATABASE_URL (local) vs POSTGRES_URL (Vercel/Supabase) e ajusta SSL
+        ├── schema.sql      # DDL completo, aplicado via `npm run migrate`
+        └── migrate.js      # lê schema.sql e executa contra o banco
 
-frontend/src/
-├── App.jsx            # define todas as rotas (públicas e protegidas)
-├── pages/             # uma página por rota (Landing, Login, Dashboard, Employees, Payroll, PayrollDetail, Leave, Documents, Team)
-├── components/         # Layout (sidebar do app logado) e BrowserFrame (moldura de screenshot na landing)
-├── hooks/useAuth.js    # login/logout/register, token e usuário em localStorage
-└── utils/api.js        # instância axios com baseURL e injeção do Bearer token
+frontend/
+├── vercel.json         # rewrite de SPA: qualquer rota cai em /index.html (senão /login etc. dão 404 direto)
+    └── src/
+        ├── App.jsx            # define todas as rotas (públicas e protegidas)
+        ├── pages/             # uma página por rota (Landing, Login, Dashboard, Employees, Payroll, PayrollDetail, Leave, Documents, Team)
+        ├── components/         # Layout (sidebar do app logado) e BrowserFrame (moldura de screenshot na landing)
+        ├── hooks/useAuth.js    # login/logout/register, token e usuário em localStorage
+        └── utils/api.js        # instância axios com baseURL e injeção do Bearer token
 ```
 
 ## Multi-tenancy

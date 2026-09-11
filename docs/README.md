@@ -11,6 +11,7 @@ do repositório cobre "como rodar" — este diretório cobre "como funciona por 
 - [api.md](api.md) — referência de todos os endpoints, autenticação, exemplos de payload
 - [frontend.md](frontend.md) — rotas, páginas, convenções de UI
 - [local-development.md](local-development.md) — passo a passo para rodar localmente, incluindo os problemas reais que apareceram ao configurar num Mac
+- [deployment.md](deployment.md) — como o deploy em produção (Vercel + Supabase + Vercel Blob) está montado, e como redeployar/migrar o banco manualmente
 - [known-limitations.md](known-limitations.md) — o que falta ou está frágil, priorizado, com o motivo de cada item
 
 ## Como manter isto atualizado

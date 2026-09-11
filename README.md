@@ -14,7 +14,7 @@ SaaS horizontal para gestão de RH em pequenas e médias empresas. Sai das plani
 
 - **Backend:** Node.js + Express + Postgres
 - **Frontend:** React + Vite + Tailwind
-- **Deploy:** Railway
+- **Deploy:** Vercel (backend serverless + frontend estático) · Postgres via Supabase · arquivos via Vercel Blob
 
 ## Quick Start
 
@@ -54,4 +54,7 @@ npm test
 
 ## Deploy
 
-Estrutura pronta para Railway. Veja `railway.json` na raiz.
+Em produção na Vercel — veja [docs/deployment.md](docs/deployment.md) para como está
+montado (dois projetos, Supabase, Vercel Blob) e como redeployar/migrar manualmente.
+`railway.json` e os `Dockerfile`s continuam no repo como caminho alternativo, não usado
+em produção.

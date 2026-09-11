@@ -64,7 +64,7 @@ test('faz upload de um arquivo real e ele aparece na lista do colaborador, com U
   });
   const created = await createRes.json();
   assert.equal(createRes.status, 201);
-  assert.match(created.file_url, /\/uploads\/[0-9a-f]+\.pdf$/);
+  assert.match(created.file_url, /^https:\/\/.*\.blob\.vercel-storage\.com\/[0-9a-f]+\.pdf$/);
 
   const listRes = await fetch(`${baseURL}/documents/${employeeId}`, { headers: authHeaders() });
   const list = await listRes.json();
@@ -122,7 +122,7 @@ test('documento sem data de vencimento não aparece na lista de vencendo', async
   assert.ok(!list.some((d) => d.doc_type === 'Contrato Indefinido'));
 });
 
-test('exclui documento e o arquivo some do disco', async () => {
+test('exclui documento e o blob some do storage', async () => {
   const createRes = await fetch(`${baseURL}/documents/${employeeId}`, {
     method: 'POST',
     headers: authHeaders(),
@@ -141,5 +141,5 @@ test('exclui documento e o arquivo some do disco', async () => {
   assert.ok(!list.some((d) => d.id === created.id));
 
   const fileRes = await fetch(created.file_url);
-  assert.equal(fileRes.status, 404, 'arquivo deveria ter sido removido do disco junto com o registro');
+  assert.equal(fileRes.status, 404, 'blob deveria ter sido removido do storage junto com o registro');
 });

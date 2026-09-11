@@ -73,9 +73,17 @@ Frontend estará em `http://localhost:3000`
    - Senha: `senha123`
 4. Vai ser redirecionado pro Dashboard
 
-## Deploy no Railway
+## Deploy
 
-### Setup inicial
+**Produção roda na Vercel, não no Railway** — veja [docs/deployment.md](docs/deployment.md)
+para como está configurado de fato (dois projetos Vercel, banco Supabase, upload via
+Vercel Blob). As instruções de Railway abaixo continuam corretas (os `Dockerfile`s e o
+`railway.json` seguem funcionais) — ficaram como caminho alternativo documentado, não
+como o que está no ar.
+
+### Railway (alternativa, não usada em produção)
+
+#### Setup inicial
 
 1. Crie uma conta em [railway.app](https://railway.app)
 2. Conecte seu repositório GitHub
@@ -152,7 +160,7 @@ psql rh_saas < backend/src/db/schema.sql
 
 ## Próximos Passos (Roadmap)
 
-- [ ] Upload real de documentos (AWS S3 ou similar)
+- [x] Upload real de documentos (Vercel Blob) — set/2026
 - [ ] Integração com contabilidade (Domínio, etc)
 - [ ] Cálculos automáticos de folha (INSS, IR, etc)
 - [ ] Relatórios PDF

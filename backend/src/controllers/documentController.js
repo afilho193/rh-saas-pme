@@ -1,8 +1,8 @@
-import fs from 'fs';
+import crypto from 'crypto';
 import path from 'path';
+import { put, del } from '@vercel/blob';
 import pool from '../db/config.js';
 import { dateError } from '../utils/validation.js';
-import { uploadsDir } from '../middleware/upload.js';
 
 export const getDocuments = async (req, res) => {
   const { employeeId } = req.params;
@@ -58,11 +58,18 @@ export const uploadDocument = async (req, res) => {
       return res.status(404).json({ error: 'Employee not found' });
     }
 
-    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    // Random, non-sequential name — the blob is public (see known-limitations.md), so an
+    // unguessable pathname is what stands between "have the exact link" and "can view
+    // the document."
+    const randomName = crypto.randomBytes(24).toString('hex');
+    const blob = await put(`${randomName}${path.extname(req.file.originalname)}`, req.file.buffer, {
+      access: 'public',
+      contentType: req.file.mimetype,
+    });
 
     const result = await pool.query(
       'INSERT INTO documents (employee_id, doc_type, file_url, expiration_date) VALUES ($1, $2, $3, $4) RETURNING *',
-      [employeeId, doc_type, fileUrl, expiration_date || null]
+      [employeeId, doc_type, blob.url, expiration_date || null]
     );
 
     return res.status(201).json(result.rows[0]);
@@ -89,16 +96,16 @@ export const deleteDocument = async (req, res) => {
 
     await pool.query('DELETE FROM documents WHERE id = $1', [id]);
 
-    // Cleanup on disk, awaited so a client checking right after this responds sees the
-    // file already gone. Only for files we host ourselves — a document created before
-    // real uploads existed may still point at an arbitrary external URL.
+    // Cleanup in Blob storage, awaited so a client checking right after this responds
+    // sees the file already gone. Only for files we host ourselves — a document created
+    // before real uploads existed (local URL or external link) isn't a blob and del()
+    // would just no-op/error harmlessly, but the explicit check keeps intent clear.
     const { file_url: fileUrl } = docCheck.rows[0];
-    if (fileUrl && fileUrl.includes('/uploads/')) {
-      const filePath = path.join(uploadsDir, fileUrl.split('/uploads/')[1]);
+    if (fileUrl && fileUrl.includes('.blob.vercel-storage.com')) {
       try {
-        await fs.promises.unlink(filePath);
+        await del(fileUrl);
       } catch (err) {
-        if (err.code !== 'ENOENT') console.error('Failed to delete file from disk:', err);
+        console.error('Failed to delete blob:', err);
       }
     }
 

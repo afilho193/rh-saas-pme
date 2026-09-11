@@ -39,9 +39,21 @@ NODE_ENV=development
 
 **Por que `PORT=5050` e não `5000`** (o valor em `.env.example`): no macOS, a porta 5000 é
 usada pelo AirPlay Receiver (Sistema > Geral > Compartilhamento). O backend falha com
-`EADDRINUSE` ao tentar subir na 5000. Isso é específico do macOS — no Railway (produção) e
-em Linux, `PORT=5000` funciona normalmente, então **não mude o Dockerfile nem o
-`railway.json`** por causa disso, mude só o `.env` local.
+`EADDRINUSE` ao tentar subir na 5000. Isso é específico do macOS — em Linux `PORT=5000`
+funciona normalmente. Não afeta produção (a função serverless na Vercel nem usa `PORT`).
+
+**Upload de documento precisa de `BLOB_READ_WRITE_TOKEN`** — desde que o storage migrou
+de disco local para Vercel Blob (ver [deployment.md](deployment.md)), mesmo em dev local
+o upload sobe para o Blob de verdade, não para uma pasta local. Pegue o token com:
+
+```bash
+cd backend && vercel env pull .env.vercel.local
+grep BLOB_READ_WRITE_TOKEN .env.vercel.local >> .env
+```
+
+Sem isso, `POST /documents/:employeeId` falha localmente (não há fallback para disco).
+Requer estar logado no Vercel CLI (`vercel login`) e o projeto `backend` já linkado
+(`vercel link`).
 
 ```bash
 npm run migrate   # aplica backend/src/db/schema.sql

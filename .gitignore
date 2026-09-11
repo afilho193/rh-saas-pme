@@ -1,7 +1,8 @@
 node_modules/
-backend/uploads/
 .env
 .env.local
+.env.vercel.local
+.vercel
 dist/
 build/
 *.log

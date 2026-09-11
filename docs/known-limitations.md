@@ -111,12 +111,15 @@ modo leitura para `member`. `Payroll.jsx` também trocou `window.location.href` 
 Não havia storage integrado — quem cadastrava precisava já ter o arquivo hospedado em
 algum lugar e colar o link.
 
-**Correção aplicada**: `POST /documents/:employeeId` agora aceita `multipart/form-data`
-de verdade (`multer`, campo `file`), salva em `backend/uploads/` (nome aleatório de 24
-bytes, não sequencial) e devolve `file_url` como uma URL absoluta e baixável
-(`http://host/uploads/<nome-aleatório>.ext`). `DELETE /documents/:id` remove o arquivo do
-disco junto com a linha do banco. Tipos aceitos: PDF, JPEG, PNG, DOC, DOCX; limite de
-10MB; qualquer outro tipo ou arquivo maior retorna `400`.
+**Correção aplicada**: `POST /documents/:employeeId` aceita `multipart/form-data`
+(`multer`, campo `file`, buffer em memória — não disco). O arquivo vai para **Vercel
+Blob** (`@vercel/blob`, `put()`) com nome aleatório de 24 bytes, não sequencial;
+`file_url` é a URL pública que o Blob devolve. `DELETE /documents/:id` chama `del()` para
+remover o blob junto com a linha do banco. Tipos aceitos: PDF, JPEG, PNG, DOC, DOCX;
+limite de 10MB; qualquer outro tipo ou arquivo maior retorna `400`. Esse desenho mudou
+duas vezes na mesma rodada — primeiro foi para disco local, depois (ao migrar o deploy de
+Railway para Vercel) para Blob, porque funções serverless não têm filesystem gravável em
+runtime. Ver [deployment.md](deployment.md).
 
 **Trade-offs deliberados, não escondidos**:
 - **Servido sem autenticação.** A app usa Bearer token em `localStorage`, não cookie —
@@ -125,17 +128,14 @@ disco junto com a linha do banco. Tipos aceitos: PDF, JPEG, PNG, DOC, DOCX; limi
   duração) que não foi construído nesta rodada. Hoje, quem tem a URL exata acessa o
   arquivo sem estar logado — mesma postura de segurança do modelo anterior (URL externa
   colada), só que agora com nome de arquivo aleatório e não-sequencial em vez de
-  confiar 100% no host externo.
-- **Disco local, não object storage.** Funciona em desenvolvimento e em qualquer deploy
-  com disco persistente. No Railway (o alvo de deploy), o filesystem é efêmero por
-  padrão — sem um volume anexado, todo arquivo enviado é perdido no próximo redeploy.
-  Migrar para S3/Supabase Storage/R2 é a forma correta de resolver isso antes de
-  produção real; não foi feito aqui por não haver conta de nenhum provedor configurada
-  no projeto.
-- **`ON DELETE CASCADE` não limpa arquivos.** Apagar uma `company` ou `employee` remove
-  as linhas de `documents` via cascade no banco, mas não chama nenhum código que apague
-  o arquivo correspondente em `uploads/` — só `DELETE /documents/:id` faz essa limpeza.
-  Arquivos órfãos no disco depois de excluir um colaborador são esperados hoje.
+  confiar 100% no host externo. O store do Blob foi criado com `--access public`
+  exatamente por causa disso.
+- **`ON DELETE CASCADE` não limpa blobs.** Apagar uma `company` ou `employee` remove as
+  linhas de `documents` via cascade no banco, mas não chama nenhum código que apague o
+  blob correspondente — só `DELETE /documents/:id` faz essa limpeza. Blobs órfãos no
+  storage depois de excluir um colaborador são esperados hoje (mesmo problema que existia
+  com disco local, só que agora custa dinheiro de armazenamento em vez de espaço em
+  disco — pequeno, mas real).
 
 ### Notificações existem só na tela, não por e-mail
 Documentos vencendo e férias pendentes aparecem no dashboard e na tela de Documentos, mas
@@ -156,9 +156,27 @@ landing page criada em set/2026.
 `index.html` ainda usa o favicon padrão do Vite (`vite.svg`), sem `meta description` nem
 `og:image` customizados.
 
-### Deploy no Railway nunca foi testado de fato
-Existem `railway.json` e `Dockerfile`s prontos, mas nenhum deploy real foi executado —
-tudo que foi validado até agora rodou em ambiente local.
+### ~~Deploy nunca tinha sido testado de fato~~ — resolvido em set/2026
+Existiam `railway.json` e `Dockerfile`s prontos, mas nenhum deploy real tinha sido
+executado — tudo validado até então rodava em ambiente local.
+
+**Feito**: deploy real em produção na Vercel (não Railway — decisão trocada por causa do
+tier gratuito sem expiração; ver [deployment.md](deployment.md) para o raciocínio
+completo). Dois projetos (`backend` como função serverless, `frontend` como build
+estático), banco Supabase provisionado via integração Vercel, uploads via Vercel Blob.
+Testado de ponta a ponta pelo navegador contra as URLs reais: landing → registro → login
+→ criar colaborador → upload de arquivo real → download do arquivo com conteúdo
+conferido byte a byte. Dois bugs só apareceram em produção, não em nenhum teste local:
+
+- **SPA sem rewrite**: `frontend/vercel.json` faltava (`/login` batia 404 real — só
+  `index.html` existe como arquivo físico no build; toda outra rota depende de
+  `react-router` no cliente, que nunca carregava). Corrigido antes de qualquer teste
+  passar.
+- **SSL do Supabase**: ver a nota detalhada em [deployment.md](deployment.md) — `pg`
+  tratava `sslmode=require` como `verify-full` e rejeitava o certificado do pooler mesmo
+  com `rejectUnauthorized: false` explícito, porque a string de conexão tinha
+  precedência. Corrigido stripando a query string e configurando SSL só pelo objeto
+  explícito.
 
 ## Ordem sugerida daqui para frente
 
@@ -171,9 +189,9 @@ tudo que foi validado até agora rodou em ambiente local.
    testes de autorização; corrigido junto com dois bugs de cálculo na mesma função).
 6. ~~Validação de dados nos controllers~~ — feito em set/2026 (`utils/validation.js`).
 7. ~~Página de detalhes da folha + sidebar no Dashboard~~ — feito em set/2026.
-8. ~~Upload de arquivo real para documentos~~ — feito em set/2026 (`multer`, disco local;
-   ver trade-offs de segurança e persistência na seção acima).
-9. Notificação por e-mail, paginação, analytics, SEO, deploy real — nessa ordem só
-   importa depois que a empresa tiver uso real acontecendo. Migrar upload de disco local
-   para object storage (S3/Supabase/R2) deveria acontecer *antes* do primeiro deploy real
-   no Railway, já que o filesystem lá é efêmero sem volume — ver acima.
+8. ~~Upload de arquivo real para documentos~~ — feito em set/2026 (Vercel Blob; ver
+   trade-offs de segurança na seção acima).
+9. ~~Deploy real~~ — feito em set/2026 (Vercel + Supabase + Vercel Blob, ver
+   [deployment.md](deployment.md)).
+10. Notificação por e-mail, paginação, analytics, SEO — nessa ordem só importa depois que
+    a empresa tiver uso real acontecendo.
