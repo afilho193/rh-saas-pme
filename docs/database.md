@@ -25,29 +25,30 @@ abaixo dela; apagar um `employee` apaga seus documentos, solicitações de féri
 
 ## Pontos de atenção
 
-### `leave_balance` só existe para o ano em que o colaborador foi cadastrado
+### ~~`leave_balance` só existia para o ano em que o colaborador foi cadastrado~~ — resolvido em set/2026
 
 `createEmployee` (em `employeeController.js`) cria automaticamente uma linha em
 `leave_balance` para o **ano corrente no momento do cadastro**, com `total_days = 20`.
-`approveLeaveRequest` (em `leaveController.js`) faz:
+Até set/2026, `approveLeaveRequest` fazia um `UPDATE` puro contra `(employee_id, year)`
+do `start_date` da solicitação — se a solicitação caísse num ano sem linha (ex.: férias
+de 2028 para um colaborador cadastrado em 2026), o `UPDATE` afetava zero registros e a
+dedução era perdida silenciosamente. `getLeaveBalance` mascarava o problema devolvendo um
+default (`{ total_days: 20, used_days: 0 }`) quando não achava linha, então o saldo
+simplesmente parecia "voltar a zerar" em vez de refletir férias já aprovadas.
+
+**Correção aplicada**: `approveLeaveRequest` agora faz um upsert —
 
 ```sql
-UPDATE leave_balance SET used_days = used_days + $dias
-WHERE employee_id = $1 AND year = $2  -- ano do start_date da solicitação
+INSERT INTO leave_balance (employee_id, year, total_days, used_days)
+VALUES ($1, $2, 20, $dias)
+ON CONFLICT (employee_id, year)
+DO UPDATE SET used_days = leave_balance.used_days + $dias
 ```
 
-Se a solicitação de férias tiver `start_date` num ano **diferente** do ano de cadastro do
-colaborador — o mais óbvio: um colaborador cadastrado em 2026 solicitando férias que começam
-em 2027 — esse `UPDATE` não encontra nenhuma linha, afeta zero registros, e a dedução é
-**perdida silenciosamente** (sem erro, sem log). `getLeaveBalance` cobre parte do problema
-ao devolver um saldo default (`{ total_days: 20, used_days: 0 }`) quando não existe linha
-para o ano consultado, mas isso mascara o problema em vez de resolvê-lo: o saldo mostrado
-volta a "20/0" em vez de refletir férias já aprovadas.
-
-**Não corrigido nesta rodada** — documentado aqui porque é o tipo de bug que só aparece na
-virada do ano, quando já afeta dados reais. Corrigir exigiria criar a linha de
-`leave_balance` sob demanda (on-the-fly) em `approveLeaveRequest`/`getLeaveBalance` quando
-ela não existir para o ano solicitado, em vez de assumir que sempre foi criada no cadastro.
+— que cria a linha do ano (com o mesmo default de 20 dias usado no cadastro) quando ela
+não existe, em vez de assumir que ela sempre foi criada antes. Regressão travada em
+`backend/tests/leave.test.js` ("aprovar férias num ano sem linha de leave_balance cria a
+linha").
 
 ### `documents.file_url` é uma URL colada, não um upload real
 

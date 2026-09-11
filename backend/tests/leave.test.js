@@ -101,12 +101,12 @@ test('rejeitar solicitação muda status sem deduzir saldo', async () => {
   assert.equal(rejected.status, 'rejeitado');
 });
 
-test('[bug conhecido] aprovar férias num ano sem linha de leave_balance não deduz nada', async () => {
-  // Documentado em docs/database.md. leave_balance só é criado para o ano de cadastro do
-  // colaborador — aprovar férias num ano futuro sem linha correspondente não gera erro,
-  // mas também não persiste a dedução. Este teste existe para travar o comportamento
-  // ATUAL, não para validar que ele está certo. No dia em que alguém corrigir o bug,
-  // esta asserção vai quebrar de propósito — troque para `used_days === 6` nesse dia.
+test('aprovar férias num ano sem linha de leave_balance cria a linha (regressão do bug corrigido em set/2026)', async () => {
+  // leave_balance só era criado para o ano de cadastro do colaborador (ver
+  // employeeController.createEmployee). Antes da correção, aprovar férias num ano sem
+  // linha correspondente não gerava erro, mas também não persistia a dedução — o saldo
+  // voltava a mostrar o default 20/0. approveLeaveRequest agora faz upsert
+  // (INSERT ... ON CONFLICT DO UPDATE) em vez de UPDATE puro.
   const futureYear = new Date().getFullYear() + 2;
   const createRes = await fetch(`${baseURL}/leave-requests`, {
     method: 'POST',
@@ -130,5 +130,6 @@ test('[bug conhecido] aprovar férias num ano sem linha de leave_balance não de
     headers: authHeaders(),
   });
   const balance = await balanceRes.json();
-  assert.equal(Number(balance.used_days), 0);
+  assert.equal(Number(balance.total_days), 20, 'linha nova deveria ter sido criada com o default de 20 dias');
+  assert.equal(Number(balance.used_days), 6); // 05 a 10/jan inclusive = 6 dias
 });

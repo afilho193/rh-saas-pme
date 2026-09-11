@@ -47,10 +47,10 @@ frontend, e casos de borda de validação (ver item abaixo).
 
 ## Dados
 
-### `leave_balance` não existe para anos além do ano de cadastro do colaborador
-Detalhado em [database.md](database.md). Aprovar férias com `start_date` num ano sem
-linha de saldo correspondente não gera erro — só não deduz nada, silenciosamente. Afeta
-qualquer colaborador com mais de um ano de casa.
+### ~~`leave_balance` não existia para anos além do ano de cadastro~~ — resolvido em set/2026
+Detalhado em [database.md](database.md). `approveLeaveRequest` agora faz upsert em vez de
+`UPDATE` puro, criando a linha do ano quando necessário. Regressão travada em
+`backend/tests/leave.test.js`.
 
 ### Sem validação de dados alem do HTML `required`
 Nenhum controller valida formato de CPF, e-mail, datas coerentes (fim antes do início),
@@ -90,7 +90,7 @@ tudo que foi validado até agora rodou em ambiente local.
 
 1. ~~Testes automatizados dos 5 fluxos principais~~ — feito em set/2026 (`backend/tests/`).
 2. ~~Empresa órfã em `POST /auth/register`~~ — feito em set/2026 (transação + teste de regressão).
-3. Corrigir o gap de `leave_balance` entre anos.
+3. ~~Gap de `leave_balance` entre anos~~ — feito em set/2026 (upsert + teste de regressão).
 4. Desenhar e implementar convite de usuário + papel real (bloqueia autorização por papel).
 5. Validação de dados nos controllers (CPF, datas, valores).
 6. Upload de arquivo real para documentos.

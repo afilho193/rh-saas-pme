@@ -93,14 +93,19 @@ export const approveLeaveRequest = async (req, res) => {
       ['aprovado', id]
     );
 
-    // Update leave balance if it's vacation
+    // Update leave balance if it's vacation. leave_balance only gets a row for the
+    // employee's hire year (see employeeController.createEmployee) — a plain UPDATE here
+    // would silently affect zero rows for any other year, losing the deduction. Upsert
+    // so a request for a year without a balance row creates one (20 days, matching the
+    // default granted at hire) instead of failing quietly.
     if (leave.type === 'férias') {
       const year = start.getFullYear();
       await pool.query(
-        `UPDATE leave_balance 
-         SET used_days = used_days + $1
-         WHERE employee_id = $2 AND year = $3`,
-        [daysRequested, leave.employee_id, year]
+        `INSERT INTO leave_balance (employee_id, year, total_days, used_days)
+         VALUES ($1, $2, 20, $3)
+         ON CONFLICT (employee_id, year)
+         DO UPDATE SET used_days = leave_balance.used_days + $3`,
+        [leave.employee_id, year, daysRequested]
       );
     }
 
