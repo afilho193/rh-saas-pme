@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import api from '../utils/api';
+import { useAuth } from '../hooks/useAuth';
 import { Plus, CheckCircle, Clock } from 'lucide-react';
 
 export default function Payroll() {
+  const { isAdmin } = useAuth();
   const [payrolls, setPayrolls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -50,16 +52,18 @@ export default function Payroll() {
       <div className="p-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Folha de Pagamento</h1>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-          >
-            <Plus className="w-5 h-5" />
-            Nova Folha
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+            >
+              <Plus className="w-5 h-5" />
+              Nova Folha
+            </button>
+          )}
         </div>
 
-        {showForm && (
+        {showForm && isAdmin && (
           <div className="bg-white rounded-lg shadow p-6 mb-8">
             <h2 className="text-xl font-semibold mb-4">Criar Nova Folha</h2>
             <form onSubmit={handleCreatePayroll} className="space-y-4">

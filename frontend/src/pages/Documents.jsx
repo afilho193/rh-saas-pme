@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import api from '../utils/api';
+import { useAuth } from '../hooks/useAuth';
 import { Plus, Trash2, AlertCircle } from 'lucide-react';
 
 export default function Documents() {
+  const { isAdmin } = useAuth();
   const [employees, setEmployees] = useState([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [documents, setDocuments] = useState([]);
@@ -81,14 +83,16 @@ export default function Documents() {
       <div className="p-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Documentos</h1>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            disabled={!selectedEmployeeId}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg disabled:opacity-50"
-          >
-            <Plus className="w-5 h-5" />
-            Novo Documento
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setShowForm(!showForm)}
+              disabled={!selectedEmployeeId}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+            >
+              <Plus className="w-5 h-5" />
+              Novo Documento
+            </button>
+          )}
         </div>
 
         {expiringDocs.length > 0 && (
@@ -128,7 +132,7 @@ export default function Documents() {
           </select>
         </div>
 
-        {showForm && (
+        {showForm && isAdmin && (
           <div className="bg-white rounded-lg shadow p-6 mb-8">
             <h2 className="text-xl font-semibold mb-4">Novo Documento</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -201,9 +205,11 @@ export default function Documents() {
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
                     Enviado em
                   </th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
-                    Ações
-                  </th>
+                  {isAdmin && (
+                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
+                      Ações
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -223,14 +229,16 @@ export default function Documents() {
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {new Date(doc.uploaded_at).toLocaleDateString('pt-BR')}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => handleDelete(doc.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
+                    {isAdmin && (
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => handleDelete(doc.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

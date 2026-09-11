@@ -4,9 +4,11 @@ Base URL local: `http://localhost:5050/api` (a porta é o que estiver em `backen
 `PORT`; veja a nota sobre a porta 5000 em
 [local-development.md](local-development.md)). Todas as rotas devolvem JSON.
 
-Rotas marcadas 🔒 exigem header `Authorization: Bearer <token>` (obtido no login/registro).
-Todas retornam **404** se o recurso não pertencer à empresa do token — não 403 — para não
-revelar se o recurso existe em outra empresa.
+Rotas marcadas 🔒 exigem header `Authorization: Bearer <token>` (obtido no login/registro)
+e aceitam qualquer papel (`admin` ou `member`). Rotas marcadas 🔒**admin** exigem
+adicionalmente que o token seja de um usuário `admin` — um `member` recebe **403**.
+Toda rota 🔒 retorna **404** (não 403) se o recurso não pertencer à empresa do token, para
+não revelar se o recurso existe em outra empresa.
 
 ## Autenticação
 
@@ -17,7 +19,7 @@ Cria uma `company` nova e o primeiro usuário (sempre `role: admin`).
 // body
 { "companyName": "Empresa Teste", "email": "a@b.com", "password": "senha123" }
 // 201
-{ "token": "...", "userId": 1, "companyId": 1 }
+{ "token": "...", "userId": 1, "companyId": 1, "role": "admin" }
 // 409 se o email já existe
 ```
 
@@ -26,61 +28,69 @@ Cria uma `company` nova e o primeiro usuário (sempre `role: admin`).
 // body
 { "email": "a@b.com", "password": "senha123" }
 // 200
-{ "token": "...", "userId": 1, "companyId": 1 }
+{ "token": "...", "userId": 1, "companyId": 1, "role": "admin" }
 // 401 se credenciais inválidas
 ```
 
-## Colaboradores 🔒
+## Equipe
 
 | Método | Rota | Descrição |
 |---|---|---|
-| GET | `/employees` | Lista colaboradores da empresa (todos os status) |
-| POST | `/employees` | Cria colaborador + linha de `leave_balance` do ano atual (20 dias) |
-| PUT | `/employees/:id` | Atualiza nome/cargo/salário/status (campos omitidos são preservados) |
-| DELETE | `/employees/:id` | **Soft delete** — marca `status = 'inativo'`, não remove a linha |
+| GET 🔒 | `/users` | Lista `{ id, email, role, created_at }` de todos os usuários da empresa |
+| POST 🔒admin | `/users` | Convida um usuário: `{ email, password, role? }` (`role` default `'member'`, aceita `'admin'`\|`'member'`) |
+
+`POST /users` retorna `400` se `role` não for `admin`/`member`, `409` se o e-mail já
+existir. Não há fluxo de convite por e-mail — a senha é definida diretamente por quem
+convida e precisa ser repassada à pessoa por fora do sistema.
+
+## Colaboradores
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET 🔒 | `/employees` | Lista colaboradores da empresa (todos os status) |
+| POST 🔒admin | `/employees` | Cria colaborador + linha de `leave_balance` do ano atual (20 dias) |
+| PUT 🔒admin | `/employees/:id` | Atualiza nome/cargo/salário/status (campos omitidos são preservados) |
+| DELETE 🔒admin | `/employees/:id` | **Soft delete** — marca `status = 'inativo'`, não remove a linha |
 
 `POST /employees` exige `name, cpf, cargo, salary, hire_date` — todos obrigatórios.
 Retorna `409` se o CPF já existir (constraint `UNIQUE` no banco).
 
-## Documentos 🔒
+## Documentos
 
 | Método | Rota | Descrição |
 |---|---|---|
-| GET | `/documents/:employeeId` | Lista documentos de um colaborador |
-| POST | `/documents/:employeeId` | Cria documento (`doc_type`, `file_url`, `expiration_date` opcional) |
-| DELETE | `/documents/:id` | Remove documento |
-| GET | `/documents/expiring/list?days=30` | Documentos de **toda a empresa** vencendo nos próximos N dias (default 30) |
+| GET 🔒 | `/documents/:employeeId` | Lista documentos de um colaborador |
+| POST 🔒admin | `/documents/:employeeId` | Cria documento (`doc_type`, `file_url`, `expiration_date` opcional) |
+| DELETE 🔒admin | `/documents/:id` | Remove documento |
+| GET 🔒 | `/documents/expiring/list?days=30` | Documentos de **toda a empresa** vencendo nos próximos N dias (default 30) |
 
 `file_url` é uma string livre — não há upload de arquivo binário (ver
 [known-limitations.md](known-limitations.md)).
 
-## Folha de Pagamento 🔒
+## Folha de Pagamento
 
 | Método | Rota | Descrição |
 |---|---|---|
-| GET | `/payroll?month=&year=` | Lista folhas (filtros opcionais) |
-| POST | `/payroll` | Cria folha do mês (`month`, `year` obrigatórios), status inicial `draft` |
-| GET | `/payroll/:id/details` | Lista os itens (lançamentos por colaborador) da folha |
-| POST | `/payroll/:id/items` | Adiciona lançamento: `employee_id`, `base_salary`, `deductions?`, `additions?` |
-| PUT | `/payroll/:id/items/:itemId` | Atualiza um lançamento (recalcula `net_salary`) |
-| POST | `/payroll/:id/approve` | Muda status da folha para `approved` |
+| GET 🔒 | `/payroll?month=&year=` | Lista folhas (filtros opcionais) |
+| POST 🔒admin | `/payroll` | Cria folha do mês (`month`, `year` obrigatórios), status inicial `draft` |
+| GET 🔒 | `/payroll/:id/details` | Lista os itens (lançamentos por colaborador) da folha |
+| POST 🔒admin | `/payroll/:id/items` | Adiciona lançamento: `employee_id`, `base_salary`, `deductions?`, `additions?` |
+| PUT 🔒admin | `/payroll/:id/items/:itemId` | Atualiza um lançamento (recalcula `net_salary`) |
+| POST 🔒admin | `/payroll/:id/approve` | Muda status da folha para `approved` |
 
 `POST /payroll` retorna `409` se já existir folha para o mesmo `(company_id, month, year)`.
 `net_salary` é sempre recalculado como `base_salary - deductions + additions` no servidor —
 o frontend não envia esse valor.
 
-## Férias e Ausências 🔒
+## Férias e Ausências
 
 | Método | Rota | Descrição |
 |---|---|---|
-| GET | `/leave-requests?employeeId=&status=` | Lista solicitações (filtros opcionais) |
-| POST | `/leave-requests` | Cria solicitação, status inicial `pendente` |
-| PUT | `/leave-requests/:id/approve` | Aprova; se `type = 'férias'`, incrementa `used_days` do saldo do ano de `start_date` |
-| PUT | `/leave-requests/:id/reject` | Rejeita (não toca no saldo) |
-| GET | `/leave-balance/:employeeId?year=` | Saldo do ano (default: ano atual). Devolve `{ total_days: 20, used_days: 0 }` se não existir linha para o ano |
-
-⚠️ Ver a nota sobre `leave_balance` em [database.md](database.md) — aprovar férias que
-começam num ano sem linha de saldo correspondente não gera erro, mas também não deduz nada.
+| GET 🔒 | `/leave-requests?employeeId=&status=` | Lista solicitações (filtros opcionais) |
+| POST 🔒admin | `/leave-requests` | Cria solicitação, status inicial `pendente` |
+| PUT 🔒admin | `/leave-requests/:id/approve` | Aprova; se `type = 'férias'`, upsert em `leave_balance` (cria a linha do ano se faltar) e incrementa `used_days` |
+| PUT 🔒admin | `/leave-requests/:id/reject` | Rejeita (não toca no saldo) |
+| GET 🔒 | `/leave-balance/:employeeId?year=` | Saldo do ano (default: ano atual). Devolve `{ total_days: 20, used_days: 0 }` se não existir linha para o ano |
 
 ## Dashboard 🔒
 

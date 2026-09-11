@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import api from '../utils/api';
+import { useAuth } from '../hooks/useAuth';
 import { Plus, Trash2, Edit2, FileText } from 'lucide-react';
 
 export default function Employees() {
+  const { isAdmin } = useAuth();
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -71,20 +73,22 @@ export default function Employees() {
       <div className="p-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Colaboradores</h1>
-          <button
-            onClick={() => {
-              setShowForm(!showForm);
-              setEditingId(null);
-              setFormData({ name: '', cpf: '', cargo: '', salary: '', hire_date: '' });
-            }}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-          >
-            <Plus className="w-5 h-5" />
-            Novo Colaborador
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setShowForm(!showForm);
+                setEditingId(null);
+                setFormData({ name: '', cpf: '', cargo: '', salary: '', hire_date: '' });
+              }}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+            >
+              <Plus className="w-5 h-5" />
+              Novo Colaborador
+            </button>
+          )}
         </div>
 
-        {showForm && (
+        {showForm && isAdmin && (
           <div className="bg-white rounded-lg shadow p-6 mb-8">
             <h2 className="text-xl font-semibold mb-4">
               {editingId ? 'Editar Colaborador' : 'Novo Colaborador'}
@@ -182,9 +186,11 @@ export default function Employees() {
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
                     Data Admissão
                   </th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
-                    Ações
-                  </th>
+                  {isAdmin && (
+                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
+                      Ações
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -199,22 +205,24 @@ export default function Employees() {
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {new Date(employee.hire_date).toLocaleDateString('pt-BR')}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => handleEdit(employee)}
-                          className="text-blue-600 hover:text-blue-700"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(employee.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                    {isAdmin && (
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleEdit(employee)}
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(employee.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

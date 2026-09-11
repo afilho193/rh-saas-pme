@@ -19,11 +19,12 @@ export const useAuth = () => {
   const login = async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password });
-      const { token, userId, companyId } = response.data;
+      const { token, userId, companyId, role } = response.data;
+      const nextUser = { id: userId, companyId, role: role || 'admin' };
       localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify({ id: userId, companyId }));
+      localStorage.setItem('user', JSON.stringify(nextUser));
       setIsAuthenticated(true);
-      setUser({ id: userId, companyId });
+      setUser(nextUser);
       return true;
     } catch (error) {
       console.error('Login failed:', error);
@@ -34,11 +35,12 @@ export const useAuth = () => {
   const register = async (companyName, email, password) => {
     try {
       const response = await api.post('/auth/register', { companyName, email, password });
-      const { token, userId, companyId } = response.data;
+      const { token, userId, companyId, role } = response.data;
+      const nextUser = { id: userId, companyId, role: role || 'admin' };
       localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify({ id: userId, companyId }));
+      localStorage.setItem('user', JSON.stringify(nextUser));
       setIsAuthenticated(true);
-      setUser({ id: userId, companyId });
+      setUser(nextUser);
       return true;
     } catch (error) {
       console.error('Registration failed:', error);
@@ -53,5 +55,10 @@ export const useAuth = () => {
     setUser(null);
   };
 
-  return { isAuthenticated, user, loading, login, register, logout };
+  // Sessions created before roles existed have no `role` in localStorage — treat anything
+  // that isn't explicitly 'member' as admin, matching the backend's fallback for tokens
+  // signed before this change.
+  const isAdmin = user?.role !== 'member';
+
+  return { isAuthenticated, user, loading, login, register, logout, isAdmin };
 };

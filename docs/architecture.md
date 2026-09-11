@@ -21,8 +21,8 @@ controllers do Express, com SQL escrito à mão via `pg`.
 backend/src/
 ├── server.js         # entrypoint: cria o app Express e chama listen()
 ├── routes/index.js   # todas as rotas da API, num único arquivo
-├── controllers/       # um arquivo por recurso (employee, payroll, leave, document, dashboard, auth)
-├── middleware/auth.js # valida o JWT e injeta req.userId / req.companyId
+├── controllers/       # um arquivo por recurso (employee, payroll, leave, document, dashboard, auth, users)
+├── middleware/auth.js # valida o JWT (injeta req.userId/companyId/role) + requireAdmin
 └── db/
     ├── config.js      # pool de conexão pg
     ├── schema.sql      # DDL completo, aplicado via `npm run migrate`
@@ -30,7 +30,7 @@ backend/src/
 
 frontend/src/
 ├── App.jsx            # define todas as rotas (públicas e protegidas)
-├── pages/             # uma página por rota (Landing, Login, Dashboard, Employees, Payroll, Leave, Documents)
+├── pages/             # uma página por rota (Landing, Login, Dashboard, Employees, Payroll, Leave, Documents, Team)
 ├── components/         # Layout (sidebar do app logado) e BrowserFrame (moldura de screenshot na landing)
 ├── hooks/useAuth.js    # login/logout/register, token e usuário em localStorage
 └── utils/api.js        # instância axios com baseURL e injeção do Bearer token
@@ -48,19 +48,29 @@ de uma empresa para outra. Ver [known-limitations.md](known-limitations.md).
 
 ## Autenticação e autorização
 
-- `POST /api/auth/register` cria uma `company` nova e um `user` com `role = 'admin'`
-  fixo — **não existe hoje nenhum fluxo para convidar ou criar um segundo usuário** numa
-  empresa já existente. A coluna `role` existe na tabela `users` mas nunca é lida de volta
-  no login nem incluída no JWT.
-- `POST /api/auth/login` retorna um JWT (`{ id, companyId }`, expira em 7 dias) que o
-  frontend guarda em `localStorage` e envia como `Authorization: Bearer <token>`.
-- `middleware/auth.js` valida o JWT e injeta `req.userId` e `req.companyId` — usado por
-  toda rota abaixo de `router.use(authMiddleware)` em `routes/index.js`.
-- **Não há verificação de papel/permissão em nenhuma rota.** Qualquer usuário autenticado
-  pode aprovar folha, aprovar férias ou excluir documentos de qualquer colaborador da
-  própria empresa. Como só existe o papel `admin` na prática, isso hoje não é explorável
-  de forma diferente — mas é a lacuna que mais importa resolver antes de a plataforma
-  suportar mais de um usuário por empresa.
+- `POST /api/auth/register` cria uma `company` nova e o primeiro `user`, sempre com
+  `role = 'admin'` (dentro de uma transação — ver [database.md](database.md) sobre o bug
+  de empresa órfã que isso corrigiu).
+- `POST /api/auth/login` retorna um JWT (`{ id, companyId, role }`, expira em 7 dias) que
+  o frontend guarda em `localStorage` (via `useAuth`) e envia como
+  `Authorization: Bearer <token>`.
+- `middleware/auth.js` valida o JWT e injeta `req.userId`, `req.companyId` e `req.role`
+  (tokens emitidos antes de set/2026 não carregam `role` — tratados como `'admin'`, já
+  que todo usuário criado antes disso era admin). O mesmo arquivo exporta `requireAdmin`,
+  usado em toda rota de escrita (`POST`/`PUT`/`DELETE`) em `routes/index.js`; rotas `GET`
+  ficam abertas a qualquer usuário autenticado da empresa.
+- **Dois papéis, dois níveis de acesso**: `admin` (acesso completo) e `member`
+  (somente leitura — vê tudo, não cria/edita/exclui/aprova nada). Não há permissões mais
+  granulares (ex.: "member pode aprovar férias mas não folha") — é uma escolha
+  deliberada de manter simples até haver um caso de uso real pedindo granularidade.
+- **Convite de usuário**: `POST /api/users` (admin-only) cria um novo `user` na mesma
+  `company_id` do token, com `role` `admin` ou `member`. `GET /api/users` lista a equipe
+  (qualquer usuário autenticado pode ver quem tem acesso). Ver
+  [frontend.md](frontend.md) sobre a página `Team.jsx` que consome isso.
+- Como `users` e `employees` são tabelas sem nenhum vínculo entre si, um `member` não
+  representa um colaborador específico — é um espectador da empresa inteira, não um
+  "colaborador logando para ver os próprios dados". Um portal de autoatendimento do
+  colaborador seria uma feature diferente, não coberta por este modelo de papéis.
 
 ## Fluxo de uma requisição autenticada
 

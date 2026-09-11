@@ -36,12 +36,12 @@ export const register = async (req, res) => {
 
     // Generate token
     const token = jwt.sign(
-      { id: userId, companyId },
+      { id: userId, companyId, role: 'admin' },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    return res.status(201).json({ token, userId, companyId });
+    return res.status(201).json({ token, userId, companyId, role: 'admin' });
   } catch (error) {
     await client.query('ROLLBACK');
     if (error.code === '23505') {
@@ -63,7 +63,7 @@ export const login = async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT id, company_id, password_hash FROM users WHERE email = $1',
+      'SELECT id, company_id, password_hash, role FROM users WHERE email = $1',
       [email]
     );
 
@@ -78,13 +78,17 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // role is nullable historically (pre-dates this column being populated); default to
+    // 'admin' for any leftover row created before invites existed.
+    const role = user.role || 'admin';
+
     const token = jwt.sign(
-      { id: user.id, companyId: user.company_id },
+      { id: user.id, companyId: user.company_id, role },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    return res.status(200).json({ token, userId: user.id, companyId: user.company_id });
+    return res.status(200).json({ token, userId: user.id, companyId: user.company_id, role });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Login failed' });

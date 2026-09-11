@@ -19,6 +19,7 @@ export default function Layout({ children }) {
     { label: 'Folha de Pagamento', path: '/payroll' },
     { label: 'Férias e Ausências', path: '/leave' },
     { label: 'Documentos', path: '/documents' },
+    { label: 'Equipe', path: '/team' },
   ];
 
   return (

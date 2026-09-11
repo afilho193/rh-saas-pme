@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import api from '../utils/api';
+import { useAuth } from '../hooks/useAuth';
 import { Plus, CheckCircle, Clock, XCircle } from 'lucide-react';
 
 export default function Leave() {
+  const { isAdmin } = useAuth();
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -92,16 +94,18 @@ export default function Leave() {
       <div className="p-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Férias e Ausências</h1>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-          >
-            <Plus className="w-5 h-5" />
-            Nova Solicitação
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+            >
+              <Plus className="w-5 h-5" />
+              Nova Solicitação
+            </button>
+          )}
         </div>
 
-        {showForm && (
+        {showForm && isAdmin && (
           <div className="bg-white rounded-lg shadow p-6 mb-8">
             <h2 className="text-xl font-semibold mb-4">Nova Solicitação</h2>
             <form onSubmit={handleCreateRequest} className="space-y-4">
@@ -233,7 +237,7 @@ export default function Leave() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {request.status === 'pendente' && (
+                      {isAdmin && request.status === 'pendente' && (
                         <div className="flex justify-end gap-2">
                           <button
                             onClick={() => handleApprove(request.id)}

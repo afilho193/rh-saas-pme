@@ -7,6 +7,7 @@ import Employees from './pages/Employees';
 import Payroll from './pages/Payroll';
 import Leave from './pages/Leave';
 import Documents from './pages/Documents';
+import Team from './pages/Team';
 import './index.css';
 
 function ProtectedRoute({ children }) {
@@ -71,6 +72,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Documents />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/team"
+          element={
+            <ProtectedRoute>
+              <Team />
             </ProtectedRoute>
           }
         />

@@ -18,17 +18,22 @@ usuário falhar, o da empresa é desfeito também. Regressão travada em
 `backend/tests/auth.test.js` ("email duplicado não deixa empresa órfã"), que assevera
 `countCompaniesByName(nomeDaTentativaFalha) === 0` depois de um 409.
 
-### Não existe controle de acesso por papel (autorização)
-A coluna `role` existe em `users` mas `register` sempre cria `role: 'admin'` e o login
-nunca lê `role` de volta nem a inclui no JWT. Qualquer usuário autenticado pode aprovar
-folha, aprovar/rejeitar férias ou excluir documentos de qualquer colaborador da própria
-empresa — não há hoje um segundo papel para comparar contra.
+### ~~Não existe controle de acesso por papel~~ — resolvido em set/2026
+`register` sempre cria `role: 'admin'`, e até essa correção o login nunca lia `role` de
+volta nem o incluía no JWT — qualquer usuário autenticado podia aprovar folha, aprovar
+férias ou excluir documentos de qualquer colaborador da própria empresa, sem checagem.
 
-**Por que não foi corrigido direto**: implementar isso de verdade exige primeiro um
-recurso que não existe — convidar/criar um segundo usuário numa empresa já cadastrada.
-Adicionar uma checagem de `role` sem esse recurso não teria efeito prático (toda conta
-existente já é admin). É maior que "uma coisa"; ver como o próximo item grande depois dos
-testes.
+**Correção aplicada**: `POST /api/users` (admin-only) convida um segundo usuário com papel
+`admin` ou `member`; login/registro agora incluem `role` no JWT e na resposta;
+`middleware/auth.js` expõe `requireAdmin`, aplicado a toda rota de escrita
+(`POST`/`PUT`/`DELETE`) em `routes/index.js`. `member` = leitura em tudo, escrita em nada.
+Ver [architecture.md](architecture.md) para o desenho completo e
+[frontend.md](frontend.md) para como a UI esconde os controles de escrita para `member`.
+
+**O que ainda não existe**: papéis mais granulares (ex.: "aprova férias mas não folha"),
+convite por e-mail (a senha é definida por quem convida e repassada por fora do sistema),
+e qualquer vínculo entre um `user` e um `employee` — um `member` é um espectador da
+empresa inteira, não um portal de autoatendimento do colaborador.
 
 ### Multi-tenancy depende de disciplina manual em cada controller
 Não há Row Level Security nem um middleware central — cada controller escreve
@@ -58,6 +63,18 @@ ou valores negativos (salário, dias de férias). O banco só impede duplicidade
 via `UNIQUE` — o resto passa.
 
 ## Produto
+
+### `Dashboard.jsx` não tem sidebar — é a única página protegida sem navegação
+Detalhado em [frontend.md](frontend.md). Achado ao testar a tela de Equipe pelo
+navegador: a partir do Dashboard não dá pra navegar pela sidebar (ela não existe ali),
+só pelos atalhos de "Ações Rápidas" ou digitando a URL. Não corrigido — é inconsistência
+de UI, não bug funcional, e mexer no Dashboard não era o escopo da vez.
+
+### "Abrir Folha" leva a uma rota que não existe
+`Payroll.jsx` navega para `/payroll/:id` ao clicar em "Abrir Folha", mas `App.jsx` não
+tem essa rota — a página de detalhes de uma folha (que consumiria
+`GET /payroll/:id/details`, já pronto no backend) nunca foi construída no frontend.
+Achado incidentalmente, não corrigido nesta rodada.
 
 ### Upload de documento é uma URL colada, não um arquivo de verdade
 `file_url` é texto livre — não há storage (S3, Supabase, etc.) integrado. Quem cadastra
@@ -91,8 +108,11 @@ tudo que foi validado até agora rodou em ambiente local.
 1. ~~Testes automatizados dos 5 fluxos principais~~ — feito em set/2026 (`backend/tests/`).
 2. ~~Empresa órfã em `POST /auth/register`~~ — feito em set/2026 (transação + teste de regressão).
 3. ~~Gap de `leave_balance` entre anos~~ — feito em set/2026 (upsert + teste de regressão).
-4. Desenhar e implementar convite de usuário + papel real (bloqueia autorização por papel).
+4. ~~Convite de usuário + papel real~~ — feito em set/2026 (`POST /users`, `requireAdmin`,
+   `Team.jsx`, gates de UI por `isAdmin`).
 5. Validação de dados nos controllers (CPF, datas, valores).
-6. Upload de arquivo real para documentos.
-7. Paginação, analytics, SEO, deploy real — nessa ordem só importa depois que a empresa
+6. Construir a página de detalhes da folha (`/payroll/:id`, hoje um link morto) e colocar
+   `Dashboard.jsx` dentro de `Layout.jsx` (única página protegida sem sidebar).
+7. Upload de arquivo real para documentos.
+8. Paginação, analytics, SEO, deploy real — nessa ordem só importa depois que a empresa
    tiver uso real acontecendo.
