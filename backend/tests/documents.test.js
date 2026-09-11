@@ -41,20 +41,60 @@ after(async () => {
 });
 
 function authHeaders() {
-  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+  return { Authorization: `Bearer ${token}` };
 }
 
-test('cria documento e ele aparece na lista do colaborador', async () => {
+function fakeFile({ name = 'documento.pdf', type = 'application/pdf', content = '%PDF-1.4 fake' } = {}) {
+  return new Blob([content], { type });
+}
+
+function uploadForm({ doc_type, expiration_date, file } = {}) {
+  const form = new FormData();
+  if (doc_type !== undefined) form.append('doc_type', doc_type);
+  if (expiration_date) form.append('expiration_date', expiration_date);
+  if (file !== null) form.append('file', file ?? fakeFile(), 'documento.pdf');
+  return form;
+}
+
+test('faz upload de um arquivo real e ele aparece na lista do colaborador, com URL baixável', async () => {
   const createRes = await fetch(`${baseURL}/documents/${employeeId}`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ doc_type: 'RG', file_url: 'https://example.com/rg.pdf' }),
+    body: uploadForm({ doc_type: 'RG' }),
   });
+  const created = await createRes.json();
   assert.equal(createRes.status, 201);
+  assert.match(created.file_url, /\/uploads\/[0-9a-f]+\.pdf$/);
 
   const listRes = await fetch(`${baseURL}/documents/${employeeId}`, { headers: authHeaders() });
   const list = await listRes.json();
   assert.ok(list.some((d) => d.doc_type === 'RG'));
+
+  // o arquivo precisa estar de fato servível na URL devolvida, não só registrado no banco
+  const fileRes = await fetch(created.file_url);
+  assert.equal(fileRes.status, 200);
+  assert.equal(await fileRes.text(), '%PDF-1.4 fake');
+});
+
+test('upload sem arquivo retorna 400', async () => {
+  const res = await fetch(`${baseURL}/documents/${employeeId}`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: uploadForm({ doc_type: 'Sem Arquivo', file: null }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('tipo de arquivo não permitido retorna 400', async () => {
+  const res = await fetch(`${baseURL}/documents/${employeeId}`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: uploadForm({
+      doc_type: 'Executavel',
+      file: fakeFile({ name: 'virus.exe', type: 'application/x-msdownload' }),
+    }),
+  });
+  assert.equal(res.status, 400);
 });
 
 test('documento vencendo em breve aparece em /documents/expiring/list', async () => {
@@ -62,7 +102,7 @@ test('documento vencendo em breve aparece em /documents/expiring/list', async ()
   await fetch(`${baseURL}/documents/${employeeId}`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ doc_type: 'ASO', file_url: 'https://example.com/aso.pdf', expiration_date: soon }),
+    body: uploadForm({ doc_type: 'ASO', expiration_date: soon }),
   });
 
   const res = await fetch(`${baseURL}/documents/expiring/list?days=30`, { headers: authHeaders() });
@@ -74,7 +114,7 @@ test('documento sem data de vencimento não aparece na lista de vencendo', async
   await fetch(`${baseURL}/documents/${employeeId}`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ doc_type: 'Contrato Indefinido', file_url: 'https://example.com/contrato.pdf' }),
+    body: uploadForm({ doc_type: 'Contrato Indefinido' }),
   });
 
   const res = await fetch(`${baseURL}/documents/expiring/list?days=30`, { headers: authHeaders() });
@@ -82,11 +122,11 @@ test('documento sem data de vencimento não aparece na lista de vencendo', async
   assert.ok(!list.some((d) => d.doc_type === 'Contrato Indefinido'));
 });
 
-test('exclui documento', async () => {
+test('exclui documento e o arquivo some do disco', async () => {
   const createRes = await fetch(`${baseURL}/documents/${employeeId}`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ doc_type: 'Para Excluir', file_url: 'https://example.com/excluir.pdf' }),
+    body: uploadForm({ doc_type: 'Para Excluir' }),
   });
   const created = await createRes.json();
 
@@ -99,4 +139,7 @@ test('exclui documento', async () => {
   const listRes = await fetch(`${baseURL}/documents/${employeeId}`, { headers: authHeaders() });
   const list = await listRes.json();
   assert.ok(!list.some((d) => d.id === created.id));
+
+  const fileRes = await fetch(created.file_url);
+  assert.equal(fileRes.status, 404, 'arquivo deveria ter sido removido do disco junto com o registro');
 });

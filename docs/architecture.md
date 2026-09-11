@@ -10,10 +10,13 @@
 | Frontend | React 18 + Vite 5 + Tailwind 3 |
 | Roteamento frontend | `react-router-dom` v6 |
 | Ícones | `lucide-react` |
+| Upload de arquivo | `multer`, disco local (`backend/uploads/`, gitignored) |
 | Deploy alvo | Railway (Dockerfiles prontos para backend e frontend) |
 
 Não há ORM, fila de jobs, cache, ou serviço de e-mail. Toda a lógica de negócio vive nos
-controllers do Express, com SQL escrito à mão via `pg`.
+controllers do Express, com SQL escrito à mão via `pg`. Uploads vão para disco local, não
+para um object storage (S3/Supabase/R2) — ver a nota sobre filesystem efêmero do Railway
+em [known-limitations.md](known-limitations.md).
 
 ## Estrutura de pastas
 
@@ -23,7 +26,9 @@ backend/src/
 ├── routes/index.js   # todas as rotas da API, num único arquivo
 ├── controllers/       # um arquivo por recurso (employee, payroll, leave, document, dashboard, auth, users)
 ├── middleware/auth.js # valida o JWT (injeta req.userId/companyId/role) + requireAdmin
+├── middleware/upload.js # config do multer: destino, nome aleatório do arquivo, tipos/tamanho aceitos
 ├── utils/validation.js # validadores pequenos e sem dependência (CPF, datas, e-mail, números)
+├── uploads/            # arquivos enviados (gitignored) — criado em runtime, não versionado
 └── db/
     ├── config.js      # pool de conexão pg
     ├── schema.sql      # DDL completo, aplicado via `npm run migrate`

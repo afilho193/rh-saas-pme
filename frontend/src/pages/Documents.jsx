@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import api from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
-import { Plus, Trash2, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, AlertCircle, Download } from 'lucide-react';
 
 export default function Documents() {
   const { isAdmin } = useAuth();
@@ -14,9 +14,10 @@ export default function Documents() {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     doc_type: '',
-    file_url: '',
+    file: null,
     expiration_date: '',
   });
+  const [uploadError, setUploadError] = useState('');
 
   useEffect(() => {
     fetchInitialData();
@@ -56,14 +57,25 @@ export default function Documents() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setUploadError('');
+    if (!formData.file) {
+      setUploadError('Selecione um arquivo');
+      return;
+    }
     try {
-      await api.post(`/documents/${selectedEmployeeId}`, formData);
-      setFormData({ doc_type: '', file_url: '', expiration_date: '' });
+      const payload = new FormData();
+      payload.append('doc_type', formData.doc_type);
+      payload.append('file', formData.file);
+      if (formData.expiration_date) {
+        payload.append('expiration_date', formData.expiration_date);
+      }
+      await api.post(`/documents/${selectedEmployeeId}`, payload);
+      setFormData({ doc_type: '', file: null, expiration_date: '' });
       setShowForm(false);
       fetchDocuments(selectedEmployeeId);
     } catch (error) {
       console.error('Failed to upload document:', error);
-      alert(error.response?.data?.error || 'Erro ao salvar documento');
+      setUploadError(error.response?.data?.error || 'Erro ao salvar documento');
     }
   };
 
@@ -135,6 +147,11 @@ export default function Documents() {
         {showForm && isAdmin && (
           <div className="bg-white rounded-lg shadow p-6 mb-8">
             <h2 className="text-xl font-semibold mb-4">Novo Documento</h2>
+            {uploadError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 text-sm">
+                {uploadError}
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
                 <input
@@ -146,12 +163,11 @@ export default function Documents() {
                   className="px-4 py-2 border border-gray-300 rounded-lg"
                 />
                 <input
-                  type="text"
-                  placeholder="URL do arquivo"
-                  value={formData.file_url}
-                  onChange={(e) => setFormData({ ...formData, file_url: e.target.value })}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  onChange={(e) => setFormData({ ...formData, file: e.target.files[0] || null })}
                   required
-                  className="px-4 py-2 border border-gray-300 rounded-lg"
+                  className="px-4 py-2 border border-gray-300 rounded-lg file:mr-2 file:text-sm file:text-blue-600"
                 />
                 <input
                   type="date"
@@ -161,6 +177,7 @@ export default function Documents() {
                   className="px-4 py-2 border border-gray-300 rounded-lg"
                 />
               </div>
+              <p className="text-xs text-gray-500">PDF, JPEG, PNG, DOC ou DOCX — até 10MB.</p>
               <div className="flex gap-2">
                 <button
                   type="submit"
@@ -216,9 +233,15 @@ export default function Documents() {
                 {documents.map((doc) => (
                   <tr key={doc.id} className="border-b hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-900">{doc.doc_type}</td>
-                    <td className="px-6 py-4 text-sm text-blue-600 truncate max-w-xs">
-                      <a href={doc.file_url} target="_blank" rel="noreferrer">
-                        {doc.file_url}
+                    <td className="px-6 py-4 text-sm">
+                      <a
+                        href={doc.file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-600 hover:text-blue-700 inline-flex items-center gap-1.5"
+                      >
+                        <Download className="w-4 h-4" />
+                        Baixar arquivo
                       </a>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">

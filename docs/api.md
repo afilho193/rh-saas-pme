@@ -68,13 +68,22 @@ banco). `PUT /employees/:id` valida `salary` (se enviado) com a mesma regra.
 | Método | Rota | Descrição |
 |---|---|---|
 | GET 🔒 | `/documents/:employeeId` | Lista documentos de um colaborador |
-| POST 🔒admin | `/documents/:employeeId` | Cria documento (`doc_type`, `file_url`, `expiration_date` opcional) |
-| DELETE 🔒admin | `/documents/:id` | Remove documento |
+| POST 🔒admin | `/documents/:employeeId` | Upload real (`multipart/form-data`): campos `doc_type`, `file`, `expiration_date` opcional |
+| DELETE 🔒admin | `/documents/:id` | Remove o registro **e** o arquivo em disco |
 | GET 🔒 | `/documents/expiring/list?days=30` | Documentos de **toda a empresa** vencendo nos próximos N dias (default 30) |
 
-`file_url` é uma string livre — não há upload de arquivo binário (ver
-[known-limitations.md](known-limitations.md)). `expiration_date`, se enviado, precisa ser
-uma data válida (`400` se não for) — mas o formato de `file_url` em si não é validado.
+`POST /documents/:employeeId` é a única rota da API que não é JSON — o corpo é
+`multipart/form-data`, com o arquivo no campo `file`. Aceita PDF, JPEG, PNG, DOC, DOCX até
+10MB; `400` para tipo não suportado, arquivo ausente, ou arquivo grande demais.
+`expiration_date`, se enviado, precisa ser uma data válida (`400` se não for). A resposta
+devolve `file_url` como uma URL absoluta e pública (`http://host/uploads/<nome>`) — ver
+[known-limitations.md](known-limitations.md) sobre essa rota **não exigir autenticação**
+para servir o arquivo (é um trade-off deliberado, não um descuido) e sobre o filesystem
+do Railway ser efêmero sem volume anexado.
+
+Registros criados antes de set/2026 podem ter `file_url` apontando para uma URL externa
+arbitrária (o formato antigo, "cole um link") — o campo sempre foi texto livre no banco,
+então os dois formatos convivem sem migração.
 
 ## Folha de Pagamento
 

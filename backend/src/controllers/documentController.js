@@ -1,5 +1,8 @@
+import fs from 'fs';
+import path from 'path';
 import pool from '../db/config.js';
 import { dateError } from '../utils/validation.js';
+import { uploadsDir } from '../middleware/upload.js';
 
 export const getDocuments = async (req, res) => {
   const { employeeId } = req.params;
@@ -31,10 +34,10 @@ export const getDocuments = async (req, res) => {
 export const uploadDocument = async (req, res) => {
   const { employeeId } = req.params;
   const { companyId } = req;
-  const { doc_type, file_url, expiration_date } = req.body;
+  const { doc_type, expiration_date } = req.body;
 
-  if (!doc_type || !file_url) {
-    return res.status(400).json({ error: 'Missing required fields' });
+  if (!doc_type || !req.file) {
+    return res.status(400).json({ error: 'Missing required fields: doc_type and file' });
   }
 
   if (expiration_date) {
@@ -55,9 +58,11 @@ export const uploadDocument = async (req, res) => {
       return res.status(404).json({ error: 'Employee not found' });
     }
 
+    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+
     const result = await pool.query(
       'INSERT INTO documents (employee_id, doc_type, file_url, expiration_date) VALUES ($1, $2, $3, $4) RETURNING *',
-      [employeeId, doc_type, file_url, expiration_date || null]
+      [employeeId, doc_type, fileUrl, expiration_date || null]
     );
 
     return res.status(201).json(result.rows[0]);
@@ -74,7 +79,7 @@ export const deleteDocument = async (req, res) => {
   try {
     // Verify document belongs to company
     const docCheck = await pool.query(
-      'SELECT d.id FROM documents d JOIN employees e ON d.employee_id = e.id WHERE d.id = $1 AND e.company_id = $2',
+      'SELECT d.id, d.file_url FROM documents d JOIN employees e ON d.employee_id = e.id WHERE d.id = $1 AND e.company_id = $2',
       [id, companyId]
     );
 
@@ -83,6 +88,20 @@ export const deleteDocument = async (req, res) => {
     }
 
     await pool.query('DELETE FROM documents WHERE id = $1', [id]);
+
+    // Cleanup on disk, awaited so a client checking right after this responds sees the
+    // file already gone. Only for files we host ourselves — a document created before
+    // real uploads existed may still point at an arbitrary external URL.
+    const { file_url: fileUrl } = docCheck.rows[0];
+    if (fileUrl && fileUrl.includes('/uploads/')) {
+      const filePath = path.join(uploadsDir, fileUrl.split('/uploads/')[1]);
+      try {
+        await fs.promises.unlink(filePath);
+      } catch (err) {
+        if (err.code !== 'ENOENT') console.error('Failed to delete file from disk:', err);
+      }
+    }
+
     return res.json({ message: 'Document deleted' });
   } catch (error) {
     console.error(error);

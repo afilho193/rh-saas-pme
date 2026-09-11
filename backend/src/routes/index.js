@@ -7,6 +7,7 @@ import * as leaveController from '../controllers/leaveController.js';
 import * as dashboardController from '../controllers/dashboardController.js';
 import * as usersController from '../controllers/usersController.js';
 import { authMiddleware, requireAdmin } from '../middleware/auth.js';
+import { upload } from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -30,7 +31,7 @@ router.delete('/employees/:id', requireAdmin, employeeController.deleteEmployee)
 
 // Documents
 router.get('/documents/:employeeId', documentController.getDocuments);
-router.post('/documents/:employeeId', requireAdmin, documentController.uploadDocument);
+router.post('/documents/:employeeId', requireAdmin, upload.single('file'), documentController.uploadDocument);
 router.delete('/documents/:id', requireAdmin, documentController.deleteDocument);
 router.get('/documents/expiring/list', documentController.getExpiringDocuments);
 

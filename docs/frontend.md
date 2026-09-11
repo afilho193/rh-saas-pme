@@ -46,9 +46,13 @@ uma nova:
    não quebra testes, só produz uma UX inconsistente (botão visível que sempre falha) ou
    uma lacuna de segurança (ação exposta que o backend não bloqueia).
 
-`Documents.jsx` adiciona uma variação: um `<select>` de colaborador no topo, porque
+`Documents.jsx` adiciona duas variações: um `<select>` de colaborador no topo, porque
 documentos são consultados por colaborador (`GET /documents/:employeeId`), não há um
-endpoint "todos os documentos da empresa" (só o de "vencendo em breve").
+endpoint "todos os documentos da empresa" (só o de "vencendo em breve"); e o único
+formulário da aplicação que não envia JSON — monta um `FormData` (campo `file` com o
+`<input type="file">`, mais `doc_type`/`expiration_date`) e deixa o axios setar o
+`Content-Type: multipart/form-data` sozinho (não defina esse header manualmente, ele
+precisa do boundary gerado pelo browser).
 
 `Team.jsx` é a única página onde `member` também não vê o botão de ação ("Convidar
 Usuário"), mas continua vendo a tabela inteira — listar a equipe é uma rota `GET`
