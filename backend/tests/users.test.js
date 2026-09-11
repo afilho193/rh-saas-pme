@@ -65,6 +65,15 @@ test('admin consegue convidar um novo usuário member', async () => {
   assert.ok(!('password_hash' in body), 'a resposta não deve vazar o hash da senha');
 });
 
+test('convite com senha curta demais retorna 400', async () => {
+  const res = await fetch(`${baseURL}/users`, {
+    method: 'POST',
+    headers: headersFor(adminToken),
+    body: JSON.stringify({ email: uniqueEmail('senha-curta'), password: '123', role: 'member' }),
+  });
+  assert.equal(res.status, 400);
+});
+
 test('convite com role inválido retorna 400', async () => {
   const res = await fetch(`${baseURL}/users`, {
     method: 'POST',

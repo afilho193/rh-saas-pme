@@ -23,6 +23,7 @@ backend/src/
 ├── routes/index.js   # todas as rotas da API, num único arquivo
 ├── controllers/       # um arquivo por recurso (employee, payroll, leave, document, dashboard, auth, users)
 ├── middleware/auth.js # valida o JWT (injeta req.userId/companyId/role) + requireAdmin
+├── utils/validation.js # validadores pequenos e sem dependência (CPF, datas, e-mail, números)
 └── db/
     ├── config.js      # pool de conexão pg
     ├── schema.sql      # DDL completo, aplicado via `npm run migrate`
@@ -30,7 +31,7 @@ backend/src/
 
 frontend/src/
 ├── App.jsx            # define todas as rotas (públicas e protegidas)
-├── pages/             # uma página por rota (Landing, Login, Dashboard, Employees, Payroll, Leave, Documents, Team)
+├── pages/             # uma página por rota (Landing, Login, Dashboard, Employees, Payroll, PayrollDetail, Leave, Documents, Team)
 ├── components/         # Layout (sidebar do app logado) e BrowserFrame (moldura de screenshot na landing)
 ├── hooks/useAuth.js    # login/logout/register, token e usuário em localStorage
 └── utils/api.js        # instância axios com baseURL e injeção do Bearer token

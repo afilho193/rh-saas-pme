@@ -9,6 +9,7 @@
 | `/dashboard` | `Dashboard` | protegida |
 | `/employees` | `Employees` | protegida |
 | `/payroll` | `Payroll` | protegida |
+| `/payroll/:id` | `PayrollDetail` | protegida |
 | `/leave` | `Leave` | protegida |
 | `/documents` | `Documents` | protegida |
 | `/team` | `Team` | protegida |
@@ -18,10 +19,9 @@
 bate com nenhuma rota (ex.: digitado errado) renderiza uma página em branco, porque
 `react-router-dom` simplesmente não encontra match e não há `<Route path="*">`.
 
-**`Dashboard.jsx` não usa `Layout.jsx`** — tem seu próprio header, sem sidebar. É a única
-página protegida sem menu de navegação; para chegar em "Equipe" (ou qualquer outra tela)
-a partir do Dashboard, o usuário depende dos atalhos de "Ações Rápidas" ou digita a URL —
-não é possível navegar pela sidebar estando no Dashboard, porque ela não existe ali.
+Todas as páginas protegidas usam `Layout.jsx` (sidebar), `Dashboard.jsx` incluído — até
+set/2026 o Dashboard tinha um header próprio e nenhuma sidebar, a única página protegida
+sem navegação lateral.
 
 ## Padrão de página (Employees, Payroll, Leave, Documents, Team)
 
@@ -54,13 +54,23 @@ endpoint "todos os documentos da empresa" (só o de "vencendo em breve").
 Usuário"), mas continua vendo a tabela inteira — listar a equipe é uma rota `GET`
 aberta a qualquer papel.
 
+`PayrollDetail.jsx` (`/payroll/:id`) foge um pouco do esqueleto acima: não existe um
+endpoint que devolva os dados da folha (mês/ano/status) junto com os itens —
+`GET /payroll/:id/details` só devolve os itens — então a página busca `GET /payroll`
+inteiro e faz `.find()` pelo id para montar o cabeçalho, em paralelo com a busca dos
+itens e da lista de colaboradores. Também introduz uma regra de negócio própria: os
+controles de escrita (novo lançamento, editar, aprovar) somem não só para `member`, mas
+também para `admin` assim que `payroll.status === 'approved'` — uma folha aprovada é
+somente leitura para todo mundo.
+
 ## `Layout.jsx`
 
-Sidebar fixa usada pelas páginas protegidas que a utilizam (não pela `Landing`, que tem
-seu próprio header, nem pelo `Dashboard`, ver nota acima). A lista de itens do menu é um
-array hardcoded dentro do componente — adicionar uma página nova ao menu significa editar
-esse array manualmente, não é derivado das rotas de `App.jsx`. O item "Equipe" aparece
-para todos os papéis (member incluído), já que a leitura da equipe é permitida a todos.
+Sidebar fixa usada por todas as páginas protegidas (não pela `Landing`, que tem seu
+próprio header). A lista de itens do menu é um array hardcoded dentro do componente —
+adicionar uma página nova ao menu significa editar esse array manualmente, não é derivado
+das rotas de `App.jsx`. O item "Equipe" aparece para todos os papéis (member incluído),
+já que a leitura da equipe é permitida a todos. `/payroll/:id` não tem item próprio no
+menu — é alcançada a partir de "Folha de Pagamento", como uma sub-página de detalhe.
 
 ## `useAuth.js`
 
@@ -90,6 +100,8 @@ essas imagens ficam desatualizadas e vale recapturá-las.
 
 - Testes de componente (nenhum arquivo `*.test.jsx`)
 - Gerenciamento de estado global (Redux/Zustand/Context) — tudo é `useState` local + refetch
-- Validação de formulário além de `required` do HTML — nada impede, por exemplo, salário
-  negativo ou data de fim de férias antes da data de início
+- Validação de formulário no cliente além de `required` do HTML — o backend valida de
+  verdade desde set/2026 (`utils/validation.js`, ver [api.md](api.md)), mas o frontend não
+  reflete essas regras antes de enviar; ele só mostra a mensagem de erro do backend num
+  `alert()` depois de um 400 vir de volta.
 - Internacionalização — todo texto é português hardcoded

@@ -17,6 +17,7 @@ import {
 let server, baseURL;
 let tokenA, companyIdA, employeeIdA;
 let tokenB, companyIdB;
+let payrollIdA, payrollItemIdA;
 
 before(async () => {
   ({ server, baseURL } = await startServer());
@@ -39,6 +40,20 @@ before(async () => {
     }),
   });
   ({ id: employeeIdA } = await empRes.json());
+
+  const payrollRes = await fetch(`${baseURL}/payroll`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+    body: JSON.stringify({ month: 5, year: 2031 }), // ano só desta suite, evita colisão
+  });
+  ({ id: payrollIdA } = await payrollRes.json());
+
+  const itemRes = await fetch(`${baseURL}/payroll/${payrollIdA}/items`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+    body: JSON.stringify({ employee_id: employeeIdA, base_salary: 5000 }),
+  });
+  ({ id: payrollItemIdA } = await itemRes.json());
 });
 
 after(async () => {
@@ -77,4 +92,25 @@ test('empresa B não consegue ver saldo de férias de colaborador da empresa A',
     headers: { Authorization: `Bearer ${tokenB}` },
   });
   assert.equal(res.status, 404);
+});
+
+test('empresa B não consegue editar item de folha da empresa A (regressão: updatePayrollItem não filtrava por company_id)', async () => {
+  // Antes da correção, PUT /payroll/:id/items/:itemId só checava
+  // `WHERE id = itemId AND payroll_id = id` — sem nenhum filtro de company_id. Qualquer
+  // admin autenticado, de qualquer empresa, conseguia editar o item de folha de outra
+  // empresa desde que soubesse (ou adivinhasse) os ids. Ver docs/known-limitations.md.
+  const res = await fetch(`${baseURL}/payroll/${payrollIdA}/items/${payrollItemIdA}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenB}` },
+    body: JSON.stringify({ base_salary: 999999 }),
+  });
+  assert.equal(res.status, 404);
+
+  // confirma que o valor da empresa A não foi alterado pela tentativa da empresa B
+  const detailsRes = await fetch(`${baseURL}/payroll/${payrollIdA}/details`, {
+    headers: { Authorization: `Bearer ${tokenA}` },
+  });
+  const items = await detailsRes.json();
+  const item = items.find((i) => i.id === payrollItemIdA);
+  assert.equal(Number(item.base_salary), 5000);
 });

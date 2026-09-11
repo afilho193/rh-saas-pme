@@ -1,4 +1,5 @@
 import pool from '../db/config.js';
+import { monthError, positiveNumberError, nonNegativeNumberError } from '../utils/validation.js';
 
 export const getPayrolls = async (req, res) => {
   const { companyId } = req;
@@ -29,6 +30,11 @@ export const createPayroll = async (req, res) => {
 
   if (!month || !year) {
     return res.status(400).json({ error: 'Missing month or year' });
+  }
+
+  const monthValidationError = monthError(month);
+  if (monthValidationError) {
+    return res.status(400).json({ error: monthValidationError });
   }
 
   try {
@@ -86,6 +92,14 @@ export const addPayrollItem = async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  const validationError =
+    positiveNumberError(base_salary, 'base_salary') ||
+    (deductions !== undefined && nonNegativeNumberError(deductions, 'deductions')) ||
+    (additions !== undefined && nonNegativeNumberError(additions, 'additions'));
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
+  }
+
   try {
     // Verify payroll belongs to company
     const payrollCheck = await pool.query(
@@ -128,25 +142,49 @@ export const updatePayrollItem = async (req, res) => {
   const { companyId } = req;
   const { base_salary, deductions, additions } = req.body;
 
-  try {
-    const deductionsVal = deductions || 0;
-    const additionsVal = additions || 0;
-    const netSalary = base_salary - deductionsVal + additionsVal;
+  const validationError =
+    (base_salary !== undefined && positiveNumberError(base_salary, 'base_salary')) ||
+    (deductions !== undefined && nonNegativeNumberError(deductions, 'deductions')) ||
+    (additions !== undefined && nonNegativeNumberError(additions, 'additions'));
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
+  }
 
-    const result = await pool.query(
-      `UPDATE payroll_items 
-       SET base_salary = COALESCE($1, base_salary), 
-           deductions = COALESCE($2, deductions),
-           additions = COALESCE($3, additions),
-           net_salary = $4
-       WHERE id = $5 AND payroll_id = $6
-       RETURNING *`,
-      [base_salary, deductionsVal, additionsVal, netSalary, itemId, id]
+  try {
+    // Fetch the current row (joined through payroll to enforce company_id — the old
+    // query here had no tenant filter at all, so any authenticated admin from any
+    // company could edit any payroll_item by id) so a partial update — e.g. only
+    // base_salary — merges onto the existing deductions/additions instead of zeroing
+    // them out. The previous COALESCE never actually fired: deductions/additions were
+    // pre-coerced to 0 in JS before reaching the query, so the column always saw 0, not
+    // NULL.
+    const current = await pool.query(
+      `SELECT pi.base_salary, pi.deductions, pi.additions
+       FROM payroll_items pi
+       JOIN payroll p ON pi.payroll_id = p.id
+       WHERE pi.id = $1 AND pi.payroll_id = $2 AND p.company_id = $3`,
+      [itemId, id, companyId]
     );
 
-    if (result.rows.length === 0) {
+    if (current.rows.length === 0) {
       return res.status(404).json({ error: 'Payroll item not found' });
     }
+
+    // pg returns DECIMAL columns as strings (to avoid float precision loss), while values
+    // from the request body arrive as JS numbers — mixing the two unconverted turns `+`
+    // into string concatenation instead of addition. Number(...) everything up front.
+    const baseSalaryVal = Number(base_salary !== undefined ? base_salary : current.rows[0].base_salary);
+    const deductionsVal = Number(deductions !== undefined ? deductions : current.rows[0].deductions);
+    const additionsVal = Number(additions !== undefined ? additions : current.rows[0].additions);
+    const netSalary = baseSalaryVal - deductionsVal + additionsVal;
+
+    const result = await pool.query(
+      `UPDATE payroll_items
+       SET base_salary = $1, deductions = $2, additions = $3, net_salary = $4
+       WHERE id = $5 AND payroll_id = $6
+       RETURNING *`,
+      [baseSalaryVal, deductionsVal, additionsVal, netSalary, itemId, id]
+    );
 
     return res.json(result.rows[0]);
   } catch (error) {

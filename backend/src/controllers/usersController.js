@@ -1,5 +1,6 @@
 import pool from '../db/config.js';
 import bcrypt from 'bcryptjs';
+import { emailError, passwordError } from '../utils/validation.js';
 
 const VALID_ROLES = ['admin', 'member'];
 
@@ -28,6 +29,11 @@ export const inviteUser = async (req, res) => {
 
   if (!VALID_ROLES.includes(role)) {
     return res.status(400).json({ error: `role must be one of: ${VALID_ROLES.join(', ')}` });
+  }
+
+  const validationError = emailError(email) || passwordError(password);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
   }
 
   try {

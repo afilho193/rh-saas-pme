@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Payroll from './pages/Payroll';
+import PayrollDetail from './pages/PayrollDetail';
 import Leave from './pages/Leave';
 import Documents from './pages/Documents';
 import Team from './pages/Team';
@@ -56,6 +57,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Payroll />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payroll/:id"
+          element={
+            <ProtectedRoute>
+              <PayrollDetail />
             </ProtectedRoute>
           }
         />

@@ -1,4 +1,7 @@
 import pool from '../db/config.js';
+import { dateRangeError } from '../utils/validation.js';
+
+const VALID_LEAVE_TYPES = ['férias', 'falta', 'abono'];
 
 export const getLeaveRequests = async (req, res) => {
   const { companyId } = req;
@@ -37,6 +40,15 @@ export const createLeaveRequest = async (req, res) => {
 
   if (!employee_id || !start_date || !end_date || !type) {
     return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  if (!VALID_LEAVE_TYPES.includes(type)) {
+    return res.status(400).json({ error: `type must be one of: ${VALID_LEAVE_TYPES.join(', ')}` });
+  }
+
+  const rangeError = dateRangeError(start_date, end_date);
+  if (rangeError) {
+    return res.status(400).json({ error: rangeError });
   }
 
   try {

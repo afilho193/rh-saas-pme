@@ -81,6 +81,63 @@ test('folha duplicada no mesmo mês/ano retorna 409', async () => {
   assert.equal(second.status, 409);
 });
 
+test('mês fora do intervalo 1-12 retorna 400', async () => {
+  const res = await fetch(`${baseURL}/payroll`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ month: 13, year: 2030 }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('deductions negativo retorna 400', async () => {
+  const payrollRes = await fetch(`${baseURL}/payroll`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ month: 9, year: 2030 }),
+  });
+  const payroll = await payrollRes.json();
+
+  const itemRes = await fetch(`${baseURL}/payroll/${payroll.id}/items`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ employee_id: employeeId, base_salary: 5000, deductions: -50 }),
+  });
+  assert.equal(itemRes.status, 400);
+});
+
+test('atualização parcial de item preserva os campos não enviados (regressão)', async () => {
+  // Antes da correção, PUT .../items/:itemId coagia deductions/additions ausentes para 0
+  // em JS antes de chegar no SQL, então o COALESCE nunca via NULL e sempre zerava os
+  // campos que não foram enviados na atualização parcial.
+  const payrollRes = await fetch(`${baseURL}/payroll`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ month: 10, year: 2030 }),
+  });
+  const payroll = await payrollRes.json();
+
+  const itemRes = await fetch(`${baseURL}/payroll/${payroll.id}/items`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ employee_id: employeeId, base_salary: 5000, deductions: 300, additions: 100 }),
+  });
+  const item = await itemRes.json();
+
+  // Atualiza só o base_salary — deductions/additions não deveriam ser tocados.
+  const updateRes = await fetch(`${baseURL}/payroll/${payroll.id}/items/${item.id}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ base_salary: 6000 }),
+  });
+  const updated = await updateRes.json();
+
+  assert.equal(Number(updated.base_salary), 6000);
+  assert.equal(Number(updated.deductions), 300, 'deductions deveria ter sido preservado');
+  assert.equal(Number(updated.additions), 100, 'additions deveria ter sido preservado');
+  assert.equal(Number(updated.net_salary), 5800); // 6000 - 300 + 100
+});
+
 test('aprovar folha muda status para approved', async () => {
   const createRes = await fetch(`${baseURL}/payroll`, {
     method: 'POST',

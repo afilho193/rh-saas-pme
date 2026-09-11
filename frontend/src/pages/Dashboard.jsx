@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import Layout from '../components/Layout';
 import api from '../utils/api';
-import { Users, FileText, Calendar, AlertCircle, LogOut } from 'lucide-react';
+import { Users, FileText, Calendar, AlertCircle } from 'lucide-react';
 
 export default function Dashboard() {
-  const { logout } = useAuth();
   const navigate = useNavigate();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -25,30 +24,10 @@ export default function Dashboard() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">RH SaaS</h1>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
-          >
-            <LogOut className="w-5 h-5" />
-            Sair
-          </button>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-12">
-        <h2 className="text-3xl font-bold text-gray-900 mb-8">Dashboard</h2>
+    <Layout>
+      <div className="p-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">Dashboard</h1>
 
         {loading ? (
           <div className="text-center py-12">
@@ -190,7 +169,7 @@ export default function Dashboard() {
             <p className="text-gray-600">Erro ao carregar dados</p>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </Layout>
   );
 }

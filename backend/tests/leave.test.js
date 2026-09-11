@@ -44,6 +44,36 @@ function authHeaders() {
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 }
 
+test('tipo de solicitação inválido retorna 400', async () => {
+  const year = new Date().getFullYear();
+  const res = await fetch(`${baseURL}/leave-requests`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      employee_id: employeeId,
+      start_date: `${year}-06-01`,
+      end_date: `${year}-06-02`,
+      type: 'sabático', // não é férias/falta/abono
+    }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('data de fim antes da data de início retorna 400', async () => {
+  const year = new Date().getFullYear();
+  const res = await fetch(`${baseURL}/leave-requests`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      employee_id: employeeId,
+      start_date: `${year}-06-10`,
+      end_date: `${year}-06-01`, // antes do início
+      type: 'férias',
+    }),
+  });
+  assert.equal(res.status, 400);
+});
+
 test('saldo inicial é 20 dias, 0 usados', async () => {
   const res = await fetch(`${baseURL}/leave-balance/${employeeId}`, { headers: authHeaders() });
   const balance = await res.json();

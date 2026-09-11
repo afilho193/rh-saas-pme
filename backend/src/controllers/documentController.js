@@ -1,4 +1,5 @@
 import pool from '../db/config.js';
+import { dateError } from '../utils/validation.js';
 
 export const getDocuments = async (req, res) => {
   const { employeeId } = req.params;
@@ -34,6 +35,13 @@ export const uploadDocument = async (req, res) => {
 
   if (!doc_type || !file_url) {
     return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  if (expiration_date) {
+    const validationError = dateError(expiration_date, 'expiration_date');
+    if (validationError) {
+      return res.status(400).json({ error: validationError });
+    }
   }
 
   try {

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import api from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
 import { Plus, CheckCircle, Clock } from 'lucide-react';
 
 export default function Payroll() {
+  const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const [payrolls, setPayrolls] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -148,7 +150,7 @@ export default function Payroll() {
                   </div>
                 </div>
                 <button
-                  onClick={() => window.location.href = `/payroll/${payroll.id}`}
+                  onClick={() => navigate(`/payroll/${payroll.id}`)}
                   className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"
                 >
                   Abrir Folha

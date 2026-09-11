@@ -35,6 +35,28 @@ convite por e-mail (a senha é definida por quem convida e repassada por fora do
 e qualquer vínculo entre um `user` e um `employee` — um `member` é um espectador da
 empresa inteira, não um portal de autoatendimento do colaborador.
 
+### ~~`PUT /payroll/:id/items/:itemId` não filtrava por empresa~~ — resolvido em set/2026
+**Encontrado escrevendo o teste de regressão de autorização**, não por revisão manual.
+A query de `updatePayrollItem` era `WHERE id = itemId AND payroll_id = id` — sem
+`company_id` em lugar nenhum. Qualquer admin autenticado, de qualquer empresa, conseguia
+editar o item de folha de outra empresa sabendo (ou adivinhando sequencialmente) os ids.
+Nenhum dos testes anteriores cobria `payroll_items` especificamente, por isso passou
+despercebido até agora.
+
+**Correção aplicada**: a query passou a buscar o item via `JOIN payroll ... WHERE
+p.company_id = $3` antes de aceitar a atualização. De caminho, corrigi também dois outros
+problemas na mesma função: (1) o `COALESCE` do SQL nunca funcionava de verdade — os
+valores ausentes eram coagidos para `0` em JS antes de chegar na query, então a coluna
+nunca via `NULL`, e uma atualização parcial (só `base_salary`, por exemplo) zerava
+`deductions`/`additions` em vez de preservá-los; (2) somar um número (do request) com uma
+string (`DECIMAL` do Postgres vem como string via `pg`) sem `Number(...)` explícito fazia
+o `+` virar concatenação de string — `6000 - "300.00" + "100.00"` resultava em
+`"5700100.00"`, não `5800`. Esse segundo bug foi introduzido pela própria correção do
+primeiro e só apareceu ao rodar o teste de regressão que eu mesmo escrevi — ver
+`backend/tests/payroll.test.js` ("atualização parcial de item preserva os campos não
+enviados") e `backend/tests/authorization.test.js` ("empresa B não consegue editar item
+de folha da empresa A").
+
 ### Multi-tenancy depende de disciplina manual em cada controller
 Não há Row Level Security nem um middleware central — cada controller escreve
 `WHERE company_id = $1` manualmente. Funciona hoje (auditado em set/2026), mas um
@@ -57,24 +79,33 @@ Detalhado em [database.md](database.md). `approveLeaveRequest` agora faz upsert 
 `UPDATE` puro, criando a linha do ano quando necessário. Regressão travada em
 `backend/tests/leave.test.js`.
 
-### Sem validação de dados alem do HTML `required`
-Nenhum controller valida formato de CPF, e-mail, datas coerentes (fim antes do início),
-ou valores negativos (salário, dias de férias). O banco só impede duplicidade de CPF/e-mail
-via `UNIQUE` — o resto passa.
+### ~~Sem validação de dados além do HTML `required`~~ — resolvido em set/2026
+Nenhum controller validava formato de CPF, e-mail, datas coerentes (fim antes do início),
+ou valores negativos (salário, dias de férias). O banco só impedia duplicidade de
+CPF/e-mail via `UNIQUE` — o resto passava.
+
+**Correção aplicada**: `backend/src/utils/validation.js` reúne validadores pequenos e
+sem dependência (`cpfError`, `positiveNumberError`, `nonNegativeNumberError`, `dateError`,
+`dateRangeError`, `emailError`, `passwordError`, `monthError`), aplicados nos pontos de
+escrita: CPF (11 dígitos) e salário/data no cadastro de colaborador; tipo de solicitação
+e `end_date >= start_date` em férias; mês 1-12 e valores não-negativos em folha; formato
+de e-mail e senha mínima (6 caracteres) em registro e convite. Deliberadamente não é uma
+lib de schema (Zod/Joi) — são checagens pontuais, do tamanho do problema atual. Se a
+lista de regras crescer muito, esse é o sinal para migrar para uma lib de verdade.
 
 ## Produto
 
-### `Dashboard.jsx` não tem sidebar — é a única página protegida sem navegação
-Detalhado em [frontend.md](frontend.md). Achado ao testar a tela de Equipe pelo
-navegador: a partir do Dashboard não dá pra navegar pela sidebar (ela não existe ali),
-só pelos atalhos de "Ações Rápidas" ou digitando a URL. Não corrigido — é inconsistência
-de UI, não bug funcional, e mexer no Dashboard não era o escopo da vez.
+### ~~`Dashboard.jsx` não tinha sidebar~~ — resolvido em set/2026
+Era a única página protegida sem navegação — para chegar em qualquer outra tela a partir
+do Dashboard, só pelos atalhos de "Ações Rápidas" ou digitando a URL. Agora usa
+`Layout.jsx` como as demais páginas.
 
-### "Abrir Folha" leva a uma rota que não existe
-`Payroll.jsx` navega para `/payroll/:id` ao clicar em "Abrir Folha", mas `App.jsx` não
-tem essa rota — a página de detalhes de uma folha (que consumiria
-`GET /payroll/:id/details`, já pronto no backend) nunca foi construída no frontend.
-Achado incidentalmente, não corrigido nesta rodada.
+### ~~"Abrir Folha" levava a uma rota que não existia~~ — resolvido em set/2026
+`Payroll.jsx` navegava para `/payroll/:id`, mas `App.jsx` não tinha essa rota. Agora existe
+`PayrollDetail.jsx` (`/payroll/:id`): lista os lançamentos, permite adicionar/editar
+lançamentos e aprovar a folha (admin, só enquanto `status = 'draft'`), e mostra tudo em
+modo leitura para `member`. `Payroll.jsx` também trocou `window.location.href` por
+`navigate()` do react-router (evitava um reload completo da página desnecessário).
 
 ### Upload de documento é uma URL colada, não um arquivo de verdade
 `file_url` é texto livre — não há storage (S3, Supabase, etc.) integrado. Quem cadastra
@@ -110,9 +141,10 @@ tudo que foi validado até agora rodou em ambiente local.
 3. ~~Gap de `leave_balance` entre anos~~ — feito em set/2026 (upsert + teste de regressão).
 4. ~~Convite de usuário + papel real~~ — feito em set/2026 (`POST /users`, `requireAdmin`,
    `Team.jsx`, gates de UI por `isAdmin`).
-5. Validação de dados nos controllers (CPF, datas, valores).
-6. Construir a página de detalhes da folha (`/payroll/:id`, hoje um link morto) e colocar
-   `Dashboard.jsx` dentro de `Layout.jsx` (única página protegida sem sidebar).
-7. Upload de arquivo real para documentos.
-8. Paginação, analytics, SEO, deploy real — nessa ordem só importa depois que a empresa
+5. ~~`updatePayrollItem` sem filtro de empresa~~ — feito em set/2026 (achado escrevendo
+   testes de autorização; corrigido junto com dois bugs de cálculo na mesma função).
+6. ~~Validação de dados nos controllers~~ — feito em set/2026 (`utils/validation.js`).
+7. ~~Página de detalhes da folha + sidebar no Dashboard~~ — feito em set/2026.
+8. Upload de arquivo real para documentos.
+9. Paginação, analytics, SEO, deploy real — nessa ordem só importa depois que a empresa
    tiver uso real acontecendo.

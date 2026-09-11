@@ -1,12 +1,18 @@
 import pool from '../db/config.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { emailError, passwordError } from '../utils/validation.js';
 
 export const register = async (req, res) => {
   const { companyName, email, password } = req.body;
 
   if (!companyName || !email || !password) {
     return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const validationError = emailError(email) || passwordError(password);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
   }
 
   // Hash password before opening the transaction — bcrypt is CPU-bound and doesn't need

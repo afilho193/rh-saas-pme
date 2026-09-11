@@ -1,4 +1,5 @@
 import pool from '../db/config.js';
+import { cpfError, positiveNumberError, dateError } from '../utils/validation.js';
 
 export const getEmployees = async (req, res) => {
   const { companyId } = req;
@@ -21,6 +22,12 @@ export const createEmployee = async (req, res) => {
 
   if (!name || !cpf || !cargo || !salary || !hire_date) {
     return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const validationError =
+    cpfError(cpf) || positiveNumberError(salary, 'salary') || dateError(hire_date, 'hire_date');
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
   }
 
   try {
@@ -50,6 +57,13 @@ export const updateEmployee = async (req, res) => {
   const { id } = req.params;
   const { companyId } = req;
   const { name, cargo, salary, status } = req.body;
+
+  if (salary !== undefined) {
+    const validationError = positiveNumberError(salary, 'salary');
+    if (validationError) {
+      return res.status(400).json({ error: validationError });
+    }
+  }
 
   try {
     const result = await pool.query(

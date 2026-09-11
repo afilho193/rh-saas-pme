@@ -90,6 +90,23 @@ test('POST /auth/login com senha errada retorna 401', async () => {
   assert.equal(res.status, 401);
 });
 
+test('registro com email em formato inválido retorna 400', async () => {
+  const { status } = await registerCompany(baseURL, {
+    companyName: 'Empresa Email Invalido',
+    email: 'não-é-um-email',
+  });
+  assert.equal(status, 400);
+});
+
+test('registro com senha curta demais retorna 400', async () => {
+  const { status } = await registerCompany(baseURL, {
+    companyName: 'Empresa Senha Curta',
+    email: uniqueEmail('senha-curta'),
+    password: '123',
+  });
+  assert.equal(status, 400);
+});
+
 test('rota protegida sem token retorna 401', async () => {
   const res = await fetch(`${baseURL}/employees`);
   assert.equal(res.status, 401);

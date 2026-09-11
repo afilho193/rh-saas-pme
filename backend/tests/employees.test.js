@@ -80,6 +80,51 @@ test('campo obrigatório faltando retorna 400', async () => {
   assert.equal(res.status, 400);
 });
 
+test('CPF com formato inválido retorna 400', async () => {
+  const res = await fetch(`${baseURL}/employees`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      name: 'CPF Curto',
+      cpf: '123', // não tem 11 dígitos
+      cargo: 'X',
+      salary: 1000,
+      hire_date: '2026-01-01',
+    }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('salário negativo ou zero retorna 400', async () => {
+  const res = await fetch(`${baseURL}/employees`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      name: 'Salario Invalido',
+      cpf: uniqueCpf(),
+      cargo: 'X',
+      salary: -100,
+      hire_date: '2026-01-01',
+    }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('data de admissão inválida retorna 400', async () => {
+  const res = await fetch(`${baseURL}/employees`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      name: 'Data Invalida',
+      cpf: uniqueCpf(),
+      cargo: 'X',
+      salary: 1000,
+      hire_date: 'não-é-uma-data',
+    }),
+  });
+  assert.equal(res.status, 400);
+});
+
 test('DELETE inativa em vez de remover (soft delete)', async () => {
   const createRes = await fetch(`${baseURL}/employees`, {
     method: 'POST',
