@@ -9,23 +9,30 @@ export const register = async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  // Hash password before opening the transaction — bcrypt is CPU-bound and doesn't need
+  // to hold a DB connection from the pool while it runs.
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     // Create company
-    const companyResult = await pool.query(
+    const companyResult = await client.query(
       'INSERT INTO companies (name) VALUES ($1) RETURNING id',
       [companyName]
     );
     const companyId = companyResult.rows[0].id;
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user
-    const userResult = await pool.query(
+    // Create user — if this fails (e.g. duplicate email), the company insert above
+    // must roll back too, otherwise we leak an orphan company with no user.
+    const userResult = await client.query(
       'INSERT INTO users (company_id, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
       [companyId, email, hashedPassword, 'admin']
     );
     const userId = userResult.rows[0].id;
+
+    await client.query('COMMIT');
 
     // Generate token
     const token = jwt.sign(
@@ -36,11 +43,14 @@ export const register = async (req, res) => {
 
     return res.status(201).json({ token, userId, companyId });
   } catch (error) {
+    await client.query('ROLLBACK');
     if (error.code === '23505') {
       return res.status(409).json({ error: 'Email already exists' });
     }
     console.error(error);
     return res.status(500).json({ error: 'Registration failed' });
+  } finally {
+    client.release();
   }
 };
 
