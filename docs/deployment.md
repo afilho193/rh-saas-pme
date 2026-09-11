@@ -6,8 +6,19 @@ sua subpasta — um push em `main` reconstrói os dois automaticamente.
 
 | Projeto Vercel | Root Directory | O que é |
 |---|---|---|
-| `backend` | `backend/` | API Express rodando como função serverless |
-| `frontend` | `frontend/` | build estático do Vite (React) |
+| `backend` | `backend` | API Express rodando como função serverless |
+| `frontend` | `frontend` | build estático do Vite (React) |
+
+**Gotcha que já mordeu uma vez**: `vercel link` rodado de dentro de `backend/` (ou
+`frontend/`) faz o **deploy manual** (`vercel deploy`) funcionar corretamente a partir
+daquela pasta, mas **não** configura o "Root Directory" do projeto — esse campo só existe
+no dashboard (Settings → General) ou via API (`PATCH /v9/projects/:id`,
+`{"rootDirectory": "backend"}`), e é ele que os **deploys automáticos via GitHub** usam
+para saber qual subpasta buildar. Sem configurar isso, o primeiro push depois do deploy
+manual falha com um erro genérico (`Cannot read properties of undefined (reading
+'fsPath')`) porque a Vercel tenta buildar a partir da raiz do monorepo. Se um projeto
+novo for criado aqui no futuro (outro serviço, outro app), lembrar de configurar o Root
+Directory explicitamente — não confiar que `vercel link` cuida disso.
 
 ## Por que Vercel e não Railway
 
@@ -89,6 +100,15 @@ funciona em desenvolvimento local **também via Vercel Blob**, não um caminho s
 `vercel env pull` na pasta `backend/`). Se esse token expirar ou for revogado no
 dashboard, o upload local para de funcionar até ele ser renovado — não existe fallback
 para disco.
+
+## URLs: alias estável vs. URL de deployment específico
+
+Cada deploy gera uma URL única com hash (`backend-<hash>-afilho193-7203s-projects.vercel.app`)
+**e** atualiza o alias estável do projeto (`backend-rust-alpha-22.vercel.app`,
+`frontend-livid-eta-81.vercel.app`) para apontar para ela. A URL com hash tem Deployment
+Protection do time habilitada por padrão (responde 302, redirecionando para login da
+Vercel) — não é bug, é a proteção normal de deployments individuais em conta de time.
+**Sempre testar/usar o alias estável**, não a URL com hash de um deploy específico.
 
 ## Redeploy manual
 
